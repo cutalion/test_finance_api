@@ -109,11 +109,9 @@ curl -X POST http://localhost:3000/api/v1/users/1/balance_transactions \
 `201 Created`
 ```json
 {
-  "id": 42,
   "user_id": 1,
   "amount": 5000,
-  "ending_balance": 17500,
-  "created_at": "2026-05-13T10:22:00Z"
+  "ending_balance": 17500
 }
 ```
 
@@ -137,7 +135,7 @@ curl -X POST http://localhost:3000/api/v1/users/1/balance_transactions \
 }
 ```
 
-Retrying with the same `Idempotency-Key` and body returns the original response (`200 OK`, same `id`). Reusing the key with a different body returns `409 Conflict`.
+Retrying with the same `Idempotency-Key` and body returns the original response (`201 Created`, byte-for-byte identical body). Reusing the key with a different body returns `409 Conflict`.
 
 ### 4. Transfer between users
 
@@ -152,13 +150,11 @@ curl -X POST http://localhost:3000/api/v1/transfers \
 `201 Created`
 ```json
 {
-  "id": 7,
   "from_user_id": 1,
   "to_user_id": 2,
   "amount": 2500,
   "from_ending_balance": 15000,
-  "to_ending_balance": 8000,
-  "created_at": "2026-05-13T10:25:11Z"
+  "to_ending_balance": 8000
 }
 ```
 
