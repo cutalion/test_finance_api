@@ -14,25 +14,20 @@ RSpec.describe Transfers::Create do
   end
 
   describe ".call" do
-    it "moves money from sender to recipient and creates paired ledger rows" do
+    it "moves money from sender to recipient and returns a payload hash" do
       result = call
 
       expect(result).to be_success
-      transfer = result.payload
-
-      expect(transfer).to be_persisted
-      expect(transfer.from_user_id).to eq(alice.id)
-      expect(transfer.to_user_id).to   eq(bob.id)
-      expect(transfer.amount).to       eq(2_500)
+      expect(result.payload).to eq(
+        from_user_id:        alice.id,
+        to_user_id:          bob.id,
+        amount:              2_500,
+        from_ending_balance: 7_500,
+        to_ending_balance:   4_500,
+      )
 
       expect(alice.reload.balance).to eq(7_500)
       expect(bob.reload.balance).to   eq(4_500)
-
-      txns = BalanceTransaction.where(transfer_id: transfer.id).order(:user_id)
-      expect(txns.size).to eq(2)
-      expect(txns.map(&:amount).sort).to eq([ -2_500, 2_500 ])
-      expect(txns.find { |t| t.user_id == alice.id }.ending_balance).to eq(7_500)
-      expect(txns.find { |t| t.user_id == bob.id   }.ending_balance).to eq(4_500)
     end
 
     shared_examples "validation error on :amount" do |amount|
@@ -41,8 +36,8 @@ RSpec.describe Transfers::Create do
 
         expect(result).to be_failure
         expect(result.errors[:amount]).to be_present
-        expect(Transfer.count).to eq(0)
-        expect(BalanceTransaction.count).to eq(0)
+        expect(alice.reload.balance).to eq(10_000)
+        expect(bob.reload.balance).to   eq(2_000)
       end
     end
 
@@ -55,7 +50,7 @@ RSpec.describe Transfers::Create do
 
       expect(result).to be_failure
       expect(result.errors[:to_user_id]).to be_present
-      expect(Transfer.count).to eq(0)
+      expect(alice.reload.balance).to eq(10_000)
     end
 
     it "fails with insufficient_funds and does not move money when sender is short" do
@@ -71,15 +66,11 @@ RSpec.describe Transfers::Create do
 
       expect(alice.reload.balance).to eq(100)
       expect(bob.reload.balance).to   eq(2_000)
-      expect(Transfer.count).to eq(0)
-      expect(BalanceTransaction.count).to eq(0)
     end
   end
 
   describe "concurrent transfers", use_transactional_fixtures: false do
     after do
-      BalanceTransaction.delete_all
-      Transfer.delete_all
       User.delete_all
     end
 
@@ -104,8 +95,6 @@ RSpec.describe Transfers::Create do
       expect(alice.reload.balance).to eq(10_500)
       expect(bob.reload.balance).to   eq(9_500)
       expect(alice.balance + bob.balance).to eq(20_000)
-      expect(Transfer.count).to eq(2)
-      expect(BalanceTransaction.count).to eq(4)
     end
   end
 end

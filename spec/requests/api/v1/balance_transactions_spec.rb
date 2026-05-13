@@ -11,11 +11,9 @@ RSpec.describe "POST /api/v1/users/:id/balance_transactions", type: :request do
 
     expect(response).to have_http_status(:created)
     expect(json_body).to match(
-      "id"             => kind_of(Integer),
       "user_id"        => user.id,
       "amount"         => 5000,
       "ending_balance" => 5000,
-      "created_at"     => kind_of(String),
     )
     expect(json_body["amount"]).to be_a(Integer)
     expect(json_body["ending_balance"]).to be_a(Integer)
@@ -31,11 +29,9 @@ RSpec.describe "POST /api/v1/users/:id/balance_transactions", type: :request do
 
     expect(response).to have_http_status(:created)
     expect(json_body).to match(
-      "id"             => kind_of(Integer),
       "user_id"        => user.id,
       "amount"         => -3000,
       "ending_balance" => 7000,
-      "created_at"     => kind_of(String),
     )
   end
 
@@ -43,7 +39,7 @@ RSpec.describe "POST /api/v1/users/:id/balance_transactions", type: :request do
     expect {
       post "/api/v1/users/#{user.id}/balance_transactions",
         params: { amount: 5000 }, as: :json
-    }.not_to change { BalanceTransaction.count }
+    }.not_to change { user.reload.balance }
 
     expect(response).to have_error_code(:invalid_token).with_status(:unauthorized)
   end
@@ -59,7 +55,7 @@ RSpec.describe "POST /api/v1/users/:id/balance_transactions", type: :request do
     expect {
       post "/api/v1/users/#{user.id}/balance_transactions",
         params: { amount: 0 }, headers: auth_headers, as: :json
-    }.not_to change { BalanceTransaction.count }
+    }.not_to change { user.reload.balance }
 
     expect(response).to have_error_code(:validation_failed).with_status(:unprocessable_content)
     expect(json_body.dig("error", "details", "amount")).to be_present
@@ -69,7 +65,7 @@ RSpec.describe "POST /api/v1/users/:id/balance_transactions", type: :request do
     expect {
       post "/api/v1/users/#{user.id}/balance_transactions",
         params: {}, headers: auth_headers, as: :json
-    }.not_to change { BalanceTransaction.count }
+    }.not_to change { user.reload.balance }
 
     expect(response).to have_error_code(:validation_failed).with_status(:unprocessable_content)
   end
@@ -78,7 +74,7 @@ RSpec.describe "POST /api/v1/users/:id/balance_transactions", type: :request do
     expect {
       post "/api/v1/users/#{user.id}/balance_transactions",
         params: { amount: Money::MAX_AMOUNT + 1 }, headers: auth_headers, as: :json
-    }.not_to change { BalanceTransaction.count }
+    }.not_to change { user.reload.balance }
 
     expect(response).to have_error_code(:validation_failed).with_status(:unprocessable_content)
     expect(json_body.dig("error", "details", "amount")).to be_present
@@ -90,7 +86,7 @@ RSpec.describe "POST /api/v1/users/:id/balance_transactions", type: :request do
     expect {
       post "/api/v1/users/#{user.id}/balance_transactions",
         params: { amount: 100 }, headers: auth_headers, as: :json
-    }.not_to change { BalanceTransaction.count }
+    }.not_to change { user.reload.balance }
 
     expect(response).to have_error_code(:balance_limit_exceeded)
       .with_status(:unprocessable_content)
@@ -103,7 +99,7 @@ RSpec.describe "POST /api/v1/users/:id/balance_transactions", type: :request do
     expect {
       post "/api/v1/users/#{user.id}/balance_transactions",
         params: { amount: -3000 }, headers: auth_headers, as: :json
-    }.not_to change { BalanceTransaction.count }
+    }.not_to change { user.reload.balance }
 
     expect(response).to have_error_code(:insufficient_funds)
       .with_status(:unprocessable_content)
@@ -122,7 +118,7 @@ RSpec.describe "POST /api/v1/users/:id/balance_transactions", type: :request do
       expect {
         post "/api/v1/users/#{user.id}/balance_transactions",
           params: { amount: 5000 }, headers: idempotency_headers, as: :json
-      }.not_to change { BalanceTransaction.count }
+      }.not_to change { user.reload.balance }
 
       expect(response).to have_http_status(:created)
       expect(json_body).to eq(original_body)
@@ -162,7 +158,7 @@ RSpec.describe "POST /api/v1/users/:id/balance_transactions", type: :request do
       expect {
         post "/api/v1/users/#{user.id}/balance_transactions",
           params: { amount: 9999 }, headers: idempotency_headers, as: :json
-      }.not_to change { BalanceTransaction.count }
+      }.not_to change { user.reload.balance }
 
       expect(response).to have_error_code(:idempotency_conflict).with_status(:conflict)
     end

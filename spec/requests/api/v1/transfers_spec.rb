@@ -9,28 +9,24 @@ RSpec.describe "POST /api/v1/transfers", type: :request do
       post "/api/v1/transfers",
         params: { from_user_id: alice.id, to_user_id: bob.id, amount: 2_500 },
         headers: auth_headers, as: :json
-    }.to change { Transfer.count }.by(1)
-     .and change { BalanceTransaction.count }.by(2)
+    }.to change { alice.reload.balance }.from(17_500).to(15_000)
+     .and change { bob.reload.balance }.from(5_500).to(8_000)
 
     expect(response).to have_http_status(:created)
     expect(json_body).to match(
-      "id"                  => kind_of(Integer),
       "from_user_id"        => alice.id,
       "to_user_id"          => bob.id,
       "amount"              => 2_500,
       "from_ending_balance" => 15_000,
       "to_ending_balance"   => 8_000,
-      "created_at"          => kind_of(String),
     )
-    expect(alice.reload.balance).to eq(15_000)
-    expect(bob.reload.balance).to   eq(8_000)
   end
 
   it "returns 401 when Authorization header is missing" do
     expect {
       post "/api/v1/transfers",
         params: { from_user_id: alice.id, to_user_id: bob.id, amount: 100 }, as: :json
-    }.not_to change { Transfer.count }
+    }.not_to change { alice.reload.balance }
 
     expect(response).to have_error_code(:invalid_token).with_status(:unauthorized)
   end
@@ -40,7 +36,7 @@ RSpec.describe "POST /api/v1/transfers", type: :request do
       post "/api/v1/transfers",
         params: { from_user_id: 999_999, to_user_id: bob.id, amount: 100 },
         headers: auth_headers, as: :json
-    }.not_to change { Transfer.count }
+    }.not_to change { alice.reload.balance }
 
     expect(response).to have_error_code(:user_not_found).with_status(:unprocessable_content)
   end
@@ -58,7 +54,7 @@ RSpec.describe "POST /api/v1/transfers", type: :request do
       post "/api/v1/transfers",
         params: { from_user_id: alice.id, to_user_id: alice.id, amount: 100 },
         headers: auth_headers, as: :json
-    }.not_to change { Transfer.count }
+    }.not_to change { alice.reload.balance }
 
     expect(response).to have_error_code(:validation_failed).with_status(:unprocessable_content)
     expect(json_body.dig("error", "details", "to_user_id")).to be_present
@@ -97,7 +93,7 @@ RSpec.describe "POST /api/v1/transfers", type: :request do
       post "/api/v1/transfers",
         params: { from_user_id: alice.id, to_user_id: bob.id, amount: 500 },
         headers: auth_headers, as: :json
-    }.not_to change { Transfer.count }
+    }.not_to change { bob.reload.balance }
 
     expect(response).to have_error_code(:balance_limit_exceeded)
       .with_status(:unprocessable_content)
@@ -119,7 +115,7 @@ RSpec.describe "POST /api/v1/transfers", type: :request do
       post "/api/v1/transfers",
         params: { from_user_id: alice.id, to_user_id: bob.id, amount: 500 },
         headers: auth_headers, as: :json
-    }.not_to change { Transfer.count }
+    }.not_to change { alice.reload.balance }
 
     expect(response).to have_error_code(:insufficient_funds)
       .with_status(:unprocessable_content)
@@ -140,7 +136,7 @@ RSpec.describe "POST /api/v1/transfers", type: :request do
         post "/api/v1/transfers",
           params: { from_user_id: alice.id, to_user_id: bob.id, amount: 2_500 },
           headers: idempotency_headers, as: :json
-      }.not_to change { Transfer.count }
+      }.not_to change { alice.reload.balance }
 
       expect(response).to have_http_status(:created)
       expect(json_body).to eq(original_body)
@@ -155,7 +151,7 @@ RSpec.describe "POST /api/v1/transfers", type: :request do
         post "/api/v1/transfers",
           params: { from_user_id: alice.id, to_user_id: bob.id, amount: 9_999 },
           headers: idempotency_headers, as: :json
-      }.not_to change { Transfer.count }
+      }.not_to change { alice.reload.balance }
 
       expect(response).to have_error_code(:idempotency_conflict).with_status(:conflict)
     end

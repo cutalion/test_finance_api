@@ -14,7 +14,7 @@ module Balance
           ensure_balance_within_limit!(new_balance)
 
           user.update!(balance: new_balance)
-          user.balance_transactions.create!(amount: amount, ending_balance: new_balance)
+          { user_id: user.id, amount: amount, ending_balance: new_balance }
         end
       end
 

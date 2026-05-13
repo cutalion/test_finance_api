@@ -40,14 +40,16 @@ module Transfers
       new_from = from_user.balance - amount
       new_to   = to_user.balance + amount
 
-      transfer = Transfer.create!(from_user: from_user, to_user: to_user, amount: amount)
       from_user.update!(balance: new_from)
       to_user.update!(balance: new_to)
 
-      from_user.balance_transactions.create!(amount: -amount, ending_balance: new_from, transfer: transfer)
-      to_user.balance_transactions.create!(amount: amount, ending_balance: new_to, transfer: transfer)
-
-      transfer
+      {
+        from_user_id:        from_user.id,
+        to_user_id:          to_user.id,
+        amount:              amount,
+        from_ending_balance: new_from,
+        to_ending_balance:   new_to,
+      }
     end
 
     def amount_must_be_positive_integer
