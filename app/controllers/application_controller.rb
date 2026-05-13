@@ -13,6 +13,8 @@ class ApplicationController < ActionController::API
     raise JWT::DecodeError, "missing token" if token.blank?
 
     payload = JsonWebToken.decode(token)
+    raise JWT::DecodeError, "missing operator role" unless payload[:role] == "operator"
+
     @current_operator = Operator.new(payload[:role])
   rescue JWT::DecodeError
     render_error(:unauthorized, "invalid_token", "Token is missing or invalid")

@@ -69,4 +69,22 @@ RSpec.describe "POST /api/v1/users", type: :request do
 
     expect(response).to have_error_code(:invalid_token).with_status(:unauthorized)
   end
+
+  it "returns 401 invalid_token when token role is not operator" do
+    post "/api/v1/users",
+      params: { email: "alice@example.com" },
+      headers: auth_headers(role: "viewer"), as: :json
+
+    expect(response).to have_error_code(:invalid_token).with_status(:unauthorized)
+  end
+
+  it "returns 401 invalid_token when token is expired" do
+    expired = JsonWebToken.encode(role: "operator", exp: 1.minute.ago.to_i)
+
+    post "/api/v1/users",
+      params: { email: "alice@example.com" },
+      headers: { "Authorization" => "Bearer #{expired}" }, as: :json
+
+    expect(response).to have_error_code(:invalid_token).with_status(:unauthorized)
+  end
 end
