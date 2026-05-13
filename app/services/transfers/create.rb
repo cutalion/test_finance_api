@@ -16,7 +16,7 @@ module Transfers
         ensure_sufficient_funds!
         ensure_recipient_balance_within_limit!
 
-        record_transfer!
+        apply_transfer!
       end
     end
 
@@ -36,7 +36,7 @@ module Transfers
             current_balance: to_user.balance, requested: amount, limit: Money::MAX_AMOUNT)
     end
 
-    def record_transfer!
+    def apply_transfer!
       new_from = from_user.balance - amount
       new_to   = to_user.balance + amount
 

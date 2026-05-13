@@ -51,6 +51,7 @@ RSpec.describe Transfers::Create do
       expect(result).to be_failure
       expect(result.errors[:to_user_id]).to be_present
       expect(alice.reload.balance).to eq(10_000)
+      expect(bob.reload.balance).to eq(2_000)
     end
 
     it "fails with insufficient_funds and does not move money when sender is short" do
