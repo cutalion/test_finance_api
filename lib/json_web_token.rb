@@ -1,19 +1,27 @@
 require "jwt"
 
 module JsonWebToken
-  include ActiveSupport::Configurable
-
-  config_accessor :secret
-
-  ALGORITHM = "HS256".freeze
+  class NotConfiguredError < StandardError; end
 
   class << self
+    attr_accessor :secret
+    attr_accessor :algorithm
+
     def encode(payload)
-      JWT.encode(payload, secret, ALGORITHM)
+      assert_configured!
+      JWT.encode(payload, secret, algorithm)
     end
 
     def decode(token)
-      JWT.decode(token, secret, true, algorithm: ALGORITHM).first.symbolize_keys
+      assert_configured!
+      JWT.decode(token, secret, true, algorithm: algorithm).first.symbolize_keys
+    end
+
+    private
+
+    def assert_configured!
+      raise NotConfiguredError, "JWT_SECRET is not configured" unless secret.present?
+      raise NotConfiguredError, "JWT_ALGORITHM is not configured" unless algorithm.present?
     end
   end
 end

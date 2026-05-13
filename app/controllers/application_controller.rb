@@ -3,9 +3,6 @@ class ApplicationController < ActionController::API
 
   before_action :authenticate_operator!
 
-  rescue_from ActiveRecord::RecordNotFound do
-    render_error(:not_found, "user_not_found", "User not found")
-  end
   rescue_from ActiveRecord::RecordInvalid, with: :render_validation_failed
   rescue_from ActionController::ParameterMissing, with: :render_parameter_missing
 
