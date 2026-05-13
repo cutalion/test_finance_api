@@ -3,6 +3,7 @@ module Transfers
     attr_accessor :from_user, :to_user, :amount
 
     validate :amount_must_be_positive_integer
+    validate :amount_must_be_within_limit
     validate :users_must_differ
     validate :from_user_must_exist
     validate :to_user_must_exist
@@ -13,6 +14,7 @@ module Transfers
         [ from_user, to_user ].sort_by(&:id).each(&:lock!)
 
         ensure_sufficient_funds!
+        ensure_recipient_balance_within_limit!
 
         record_transfer!
       end
@@ -25,6 +27,13 @@ module Transfers
 
       fail!(:insufficient_funds, message: "Balance would go negative",
             current_amount: from_user.amount, requested: amount)
+    end
+
+    def ensure_recipient_balance_within_limit!
+      return if to_user.amount + amount <= Money::MAX_AMOUNT
+
+      fail!(:balance_limit_exceeded, message: "Recipient balance would exceed the maximum",
+            current_amount: to_user.amount, requested: amount, limit: Money::MAX_AMOUNT)
     end
 
     def record_transfer!
@@ -44,6 +53,12 @@ module Transfers
     def amount_must_be_positive_integer
       return if amount.is_a?(Integer) && amount.positive?
       errors.add(:amount, "must be a positive integer")
+    end
+
+    def amount_must_be_within_limit
+      return unless amount.is_a?(Integer) && amount.positive?
+      return if amount <= Money::MAX_AMOUNT
+      errors.add(:amount, "must not exceed #{Money::MAX_AMOUNT}")
     end
 
     def users_must_differ

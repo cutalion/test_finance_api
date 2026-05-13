@@ -80,6 +80,30 @@ RSpec.describe "POST /api/v1/transfers", type: :request do
     expect(response).to have_error_code(:validation_failed).with_status(:unprocessable_content)
   end
 
+  it "returns 422 validation_failed when amount exceeds Money::MAX_AMOUNT" do
+    post "/api/v1/transfers",
+      params: { from_user_id: alice.id, to_user_id: bob.id, amount: Money::MAX_AMOUNT + 1 },
+      headers: auth_headers, as: :json
+
+    expect(response).to have_error_code(:validation_failed).with_status(:unprocessable_content)
+    expect(json_body.dig("error", "details", "amount")).to be_present
+  end
+
+  it "returns 422 balance_limit_exceeded when recipient balance would exceed the limit" do
+    alice.update!(amount: 1_000)
+    bob.update!(amount: Money::MAX_AMOUNT - 100)
+
+    expect {
+      post "/api/v1/transfers",
+        params: { from_user_id: alice.id, to_user_id: bob.id, amount: 500 },
+        headers: auth_headers, as: :json
+    }.not_to change { Transfer.count }
+
+    expect(response).to have_error_code(:balance_limit_exceeded)
+      .with_status(:unprocessable_content)
+      .with_details(current_amount: Money::MAX_AMOUNT - 100, requested: 500, limit: Money::MAX_AMOUNT)
+  end
+
   it "returns 422 validation_failed when amount is missing" do
     post "/api/v1/transfers",
       params: { from_user_id: alice.id, to_user_id: bob.id },
