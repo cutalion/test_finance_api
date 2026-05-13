@@ -7,10 +7,12 @@ Minimal Rails 8 API. See `TASK.md` for the spec.
 ## Quick start
 
 ```bash
-bin/e2e
+bin/e2e --fresh
 ```
 
 Builds the image, prepares the database, boots the server, and exercises every endpoint with `curl` (including idempotency and error paths). Stops the containers on exit.
+
+`--fresh` wipes the postgres volume first (`docker compose down -v`). Use it when switching between the `main` and `simplified` branches (their schemas differ), or to recover from a corrupted volume left by a prior unclean shutdown. Omit it for repeat runs on the same branch.
 
 ## Manual testing (Docker Compose)
 
@@ -24,9 +26,8 @@ docker compose run --rm web bin/rails db:prepare
 # 3. Run the test suite
 docker compose run --rm web bundle exec rspec
 
-# 4. Mint an operator JWT (set JWT_SECRET in your environment or `.env` first)
-docker compose run --rm web bin/rails operator:token
-export TOKEN=<paste the token printed above>
+# 4. Mint an operator JWT and export it (set JWT_SECRET in your environment or `.env` first)
+export TOKEN=$(docker compose run --rm -T web bin/rails operator:token | tr -d '\r' | tail -n 1)
 
 # 5. Start the server (http://localhost:3000)
 docker compose up
