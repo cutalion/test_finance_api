@@ -115,7 +115,7 @@ RSpec.describe "POST /api/v1/users/:id/balance_transactions", type: :request do
 
     it "rejects an overlong Idempotency-Key with 400 malformed_idempotency_key" do
       post "/api/v1/users/#{user.id}/balance_transactions",
-        params: { amount: 5000 }, headers: auth_headers.merge("Idempotency-Key" => "x" * 33), as: :json
+        params: { amount: 5000 }, headers: auth_headers.merge("Idempotency-Key" => "x" * 41), as: :json
 
       expect(response).to have_error_code(:malformed_idempotency_key).with_status(:bad_request)
     end
