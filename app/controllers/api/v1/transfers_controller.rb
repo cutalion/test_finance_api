@@ -4,7 +4,7 @@ module Api
       include Idempotent
 
       def create
-        result = Balance::Transfer.call(
+        result = ::Balance::Transfer.call(
           from:   User.find_by(id: params[:from_user_id]),
           to:     User.find_by(id: params[:to_user_id]),
           amount: params[:amount],

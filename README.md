@@ -99,7 +99,7 @@ curl http://localhost:3000/api/v1/users/1/balance \
 Top up (positive amount):
 
 ```bash
-curl -X POST http://localhost:3000/api/v1/users/1/balance_transactions \
+curl -X POST http://localhost:3000/api/v1/users/1/balance/adjustments \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Idempotency-Key: 7c9e6679-7425-40de-944b-e07fc1f90ae7' \
   -H 'Content-Type: application/json' \
@@ -118,7 +118,7 @@ curl -X POST http://localhost:3000/api/v1/users/1/balance_transactions \
 Debit (negative amount):
 
 ```bash
-curl -X POST http://localhost:3000/api/v1/users/1/balance_transactions \
+curl -X POST http://localhost:3000/api/v1/users/1/balance/adjustments \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"amount":-3000}'

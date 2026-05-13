@@ -7,7 +7,7 @@ RSpec.describe Idempotency::Resolver do
   def request_for(
     headers: { "Idempotency-Key" => key },
     method: "POST",
-    path: "/api/v1/users/1/balance_transactions",
+    path: "/api/v1/users/1/balance/adjustments",
     raw_post: body
   )
     Struct.new(:headers, :method, :path, :raw_post).new(headers, method, path, raw_post)
