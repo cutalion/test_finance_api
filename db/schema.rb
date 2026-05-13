@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_13_150001) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_13_150002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "citext"
   enable_extension "pg_catalog.plpgsql"
@@ -26,6 +26,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_13_150001) do
     t.index ["user_id", "created_at"], name: "index_balance_transactions_on_user_id_and_created_at"
     t.index ["user_id"], name: "index_balance_transactions_on_user_id"
     t.check_constraint "amount <> 0", name: "btx_amount_nonzero"
+    t.check_constraint "amount >= '-1000000000000'::bigint AND amount <= '1000000000000'::bigint", name: "btx_amount_within_limit"
+    t.check_constraint "ending_amount <= '1000000000000'::bigint", name: "btx_ending_within_limit"
     t.check_constraint "ending_amount >= 0", name: "btx_ending_nonneg"
   end
 
@@ -41,6 +43,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_13_150001) do
     t.datetime "updated_at", null: false
     t.index ["expires_at"], name: "index_idempotency_keys_on_expires_at"
     t.index ["key"], name: "index_idempotency_keys_on_key", unique: true
+    t.check_constraint "char_length(key) >= 1 AND char_length(key) <= 40", name: "idempotency_keys_key_length"
+    t.check_constraint "char_length(request_hash) = 64", name: "idempotency_keys_request_hash_length"
+    t.check_constraint "response_body IS NULL OR char_length(response_body) <= 16384", name: "idempotency_keys_response_body_length"
   end
 
   create_table "transfers", force: :cascade do |t|
@@ -51,6 +56,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_13_150001) do
     t.datetime "updated_at", null: false
     t.index ["from_user_id"], name: "index_transfers_on_from_user_id"
     t.index ["to_user_id"], name: "index_transfers_on_to_user_id"
+    t.check_constraint "amount <= '1000000000000'::bigint", name: "transfers_amount_within_limit"
     t.check_constraint "amount > 0", name: "transfers_amount_positive"
     t.check_constraint "from_user_id <> to_user_id", name: "transfers_distinct_users"
   end
@@ -61,7 +67,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_13_150001) do
     t.citext "email", null: false
     t.datetime "updated_at", null: false
     t.index ["email"], name: "index_users_on_email", unique: true
+    t.check_constraint "amount <= '1000000000000'::bigint", name: "users_amount_within_limit"
     t.check_constraint "amount >= 0", name: "users_amount_non_negative"
+    t.check_constraint "char_length(email::text) <= 255", name: "users_email_length"
   end
 
   add_foreign_key "balance_transactions", "transfers"

@@ -4,12 +4,14 @@ module Balance
       attr_accessor :user, :amount
 
       validate :amount_must_be_nonzero_integer
+      validate :amount_must_be_within_limit
 
       def perform
         ActiveRecord::Base.transaction do
           user.lock!
           new_balance = user.amount + amount # `amount` can be negative
           ensure_sufficient_funds!(new_balance)
+          ensure_balance_within_limit!(new_balance)
 
           user.update!(amount: new_balance)
           user.balance_transactions.create!(amount: amount, ending_amount: new_balance)
@@ -23,10 +25,22 @@ module Balance
         errors.add(:amount, "must be a non-zero integer")
       end
 
+      def amount_must_be_within_limit
+        return unless amount.is_a?(Integer)
+        return if amount.abs <= Money::MAX_AMOUNT
+        errors.add(:amount, "must not exceed #{Money::MAX_AMOUNT} in magnitude")
+      end
+
       def ensure_sufficient_funds!(new_balance)
         return unless new_balance.negative?
         fail!(:insufficient_funds, message: "Balance would go negative",
               current_amount: user.amount, requested: amount)
+      end
+
+      def ensure_balance_within_limit!(new_balance)
+        return if new_balance <= Money::MAX_AMOUNT
+        fail!(:balance_limit_exceeded, message: "Resulting balance would exceed the maximum",
+              current_amount: user.amount, requested: amount, limit: Money::MAX_AMOUNT)
       end
     end
   end

@@ -3,5 +3,9 @@ class User < ApplicationRecord
 
   has_many :balance_transactions, dependent: :destroy
 
-  validates :email, presence: true, format: { with: EMAIL_REGEX }, uniqueness: { case_sensitive: false }
+  validates :email,
+    presence: true,
+    length: { maximum: 255 },
+    format: { with: EMAIL_REGEX },
+    uniqueness: { case_sensitive: false }
 end
