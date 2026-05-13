@@ -109,9 +109,8 @@ curl -X POST http://localhost:3000/api/v1/users/1/balance/adjustments \
 `201 Created`
 ```json
 {
-  "user_id": 1,
   "amount": 5000,
-  "ending_balance": 17500
+  "result": { "user_id": 1, "balance": 17500 }
 }
 ```
 
@@ -150,11 +149,9 @@ curl -X POST http://localhost:3000/api/v1/transfers \
 `201 Created`
 ```json
 {
-  "from_user_id": 1,
-  "to_user_id": 2,
   "amount": 2500,
-  "from_ending_balance": 15000,
-  "to_ending_balance": 8000
+  "from": { "user_id": 1, "balance": 15000 },
+  "to":   { "user_id": 2, "balance": 8000 }
 }
 ```
 

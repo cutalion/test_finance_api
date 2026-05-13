@@ -105,6 +105,15 @@ json_get() {
     | sed -E "s/^\"$leaf\"[[:space:]]*:[[:space:]]*//; s/^\"(.*)\"$/\1/"
 }
 
+# Extract a leaf from a nested object: json_subget <outer> <leaf> <json>.
+# Slices out `"<outer>":{...}` (single-level braces only) then runs json_get.
+json_subget() {
+  local outer="$1" leaf="$2" json="$3"
+  local sub
+  sub=$(printf '%s' "$json" | grep -oE "\"$outer\"[[:space:]]*:[[:space:]]*\\{[^}]*\\}" | head -n1)
+  json_get "$leaf" "$sub"
+}
+
 assert_status() {
   local want="$1" got="$2" label="$3"
   if [[ "$got" == "$want" ]]; then
@@ -219,13 +228,13 @@ http POST "/api/v1/users/$ALICE_ID/balance/adjustments" \
   "${AUTH[@]}" -H "Idempotency-Key: $IDEM_TOPUP" \
   -d '{"amount":5000}'
 assert_status 201 "$STATUS" "top up 5000"
-assert_eq "5000" "$(json_get ending_balance "$BODY")" "  → ending_balance is 5000"
+assert_eq "5000" "$(json_subget result balance "$BODY")" "  → result.balance is 5000"
 
 http POST "/api/v1/users/$ALICE_ID/balance/adjustments" \
   "${AUTH[@]}" -H "Idempotency-Key: $IDEM_TOPUP" \
   -d '{"amount":5000}'
 assert_status 201 "$STATUS" "idempotent replay returns cached response"
-assert_eq "5000" "$(json_get ending_balance "$BODY")" "  → cached ending_balance is 5000"
+assert_eq "5000" "$(json_subget result balance "$BODY")" "  → cached result.balance is 5000"
 
 http POST "/api/v1/users/$ALICE_ID/balance/adjustments" \
   "${AUTH[@]}" -H "Idempotency-Key: $IDEM_TOPUP" \
@@ -236,7 +245,7 @@ assert_eq "idempotency_conflict" "$(json_get error.code "$BODY")" "  → error.c
 http POST "/api/v1/users/$ALICE_ID/balance/adjustments" \
   "${AUTH[@]}" -d '{"amount":-2000}'
 assert_status 201 "$STATUS" "debit 2000"
-assert_eq "3000" "$(json_get ending_balance "$BODY")" "  → ending_balance is 3000"
+assert_eq "3000" "$(json_subget result balance "$BODY")" "  → result.balance is 3000"
 
 http POST "/api/v1/users/$ALICE_ID/balance/adjustments" \
   "${AUTH[@]}" -d '{"amount":-999999}'
@@ -258,8 +267,8 @@ http POST /api/v1/transfers \
   "${AUTH[@]}" -H "Idempotency-Key: $IDEM_XFER" \
   -d "{\"from_user_id\":$ALICE_ID,\"to_user_id\":$BOB_ID,\"amount\":1000}"
 assert_status 201 "$STATUS" "transfer 1000 alice → bob"
-assert_eq "2000" "$(json_get from_ending_balance "$BODY")" "  → alice ending 2000"
-assert_eq "1000" "$(json_get to_ending_balance   "$BODY")" "  → bob ending 1000"
+assert_eq "2000" "$(json_subget from balance "$BODY")" "  → from.balance is 2000"
+assert_eq "1000" "$(json_subget to   balance "$BODY")" "  → to.balance is 1000"
 
 http GET "/api/v1/users/$ALICE_ID/balance" "${AUTH[@]}"
 assert_eq "2000" "$(json_get balance "$BODY")" "alice balance now 2000"

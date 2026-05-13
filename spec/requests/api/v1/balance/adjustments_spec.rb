@@ -11,12 +11,11 @@ RSpec.describe "POST /api/v1/users/:id/balance/adjustments", type: :request do
 
     expect(response).to have_http_status(:created)
     expect(json_body).to match(
-      "user_id"        => user.id,
-      "amount"         => 5000,
-      "ending_balance" => 5000,
+      "amount" => 5000,
+      "result" => { "user_id" => user.id, "balance" => 5000 },
     )
     expect(json_body["amount"]).to be_a(Integer)
-    expect(json_body["ending_balance"]).to be_a(Integer)
+    expect(json_body["result"]["balance"]).to be_a(Integer)
   end
 
   it "debits a balance and returns 201 with a negative amount" do
@@ -29,9 +28,8 @@ RSpec.describe "POST /api/v1/users/:id/balance/adjustments", type: :request do
 
     expect(response).to have_http_status(:created)
     expect(json_body).to match(
-      "user_id"        => user.id,
-      "amount"         => -3000,
-      "ending_balance" => 7000,
+      "amount" => -3000,
+      "result" => { "user_id" => user.id, "balance" => 7000 },
     )
   end
 

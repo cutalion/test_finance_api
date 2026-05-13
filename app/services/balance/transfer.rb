@@ -16,7 +16,7 @@ module Balance
         ensure_sufficient_funds!
         ensure_recipient_balance_within_limit!
 
-        apply_transfer!
+        transfer!
       end
     end
 
@@ -36,7 +36,7 @@ module Balance
             current_balance: to.balance, requested: amount, limit: Money::MAX_AMOUNT)
     end
 
-    def apply_transfer!
+    def transfer!
       new_from = from.balance - amount
       new_to   = to.balance + amount
 
@@ -44,11 +44,9 @@ module Balance
       to.update!(balance: new_to)
 
       {
-        from_user_id:        from.id,
-        to_user_id:          to.id,
-        amount:              amount,
-        from_ending_balance: new_from,
-        to_ending_balance:   new_to
+        amount: amount,
+        from:   { user_id: from.id, balance: new_from },
+        to:     { user_id: to.id,   balance: new_to }
       }
     end
 
