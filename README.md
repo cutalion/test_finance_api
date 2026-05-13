@@ -1,8 +1,8 @@
-# test_finance_api
+# Тестовое задание: Финансовое API
 
-Minimal Rails 8 API. See `TASK.md` for the spec.
+Minimal Rails 8 API. See [`TASK.md`](TASK.md) for the spec.
 
-> **Branches:** `main` (this branch) records every balance change in ledger tables (transactions + transfers); `simplified` keeps only the current balance — no history. **API request paths and response shapes differ between the two branches**, so the examples below are specific to `main`.
+> **Branches:** [`main`](https://github.com/cutalion/test_finance_api/tree/main) (this branch) records every balance change in ledger tables (transactions + transfers); [`simplified`](https://github.com/cutalion/test_finance_api/tree/simplified) keeps only the current balance — no history. **API request paths and response shapes differ between the two branches**, so the examples below are specific to `main`.
 
 ## Quick start
 
