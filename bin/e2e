@@ -1,0 +1,289 @@
+#!/usr/bin/env bash
+# End-to-end smoke test: spins up the docker compose stack, provisions the DB,
+# then exercises each API endpoint with curl and asserts the response.
+#
+# Dependencies: bash, docker (with compose plugin), curl. Nothing else.
+#
+# Usage: bin/e2e [--fresh] [--keep]
+#   --fresh  `docker compose down -v` first (wipes the postgres volume — needed
+#            if a previous unclean shutdown left it corrupted)
+#   --keep   leave containers running after the run (default: stop them)
+set -euo pipefail
+
+FRESH=0
+KEEP=0
+for arg in "$@"; do
+  case "$arg" in
+    --fresh) FRESH=1 ;;
+    --keep)  KEEP=1 ;;
+    *) printf 'unknown flag: %s\n' "$arg" >&2; exit 2 ;;
+  esac
+done
+
+BASE_URL="http://localhost:3000"
+PASS=0
+FAIL=0
+FAILED_TESTS=()
+
+c_red()   { printf '\033[31m%s\033[0m' "$*"; }
+c_green() { printf '\033[32m%s\033[0m' "$*"; }
+c_dim()   { printf '\033[2m%s\033[0m'  "$*"; }
+step()    { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
+
+pass() {
+  PASS=$((PASS + 1))
+  printf '  %s %s\n' "$(c_green '✔')" "$1"
+}
+
+fail() {
+  FAIL=$((FAIL + 1))
+  FAILED_TESTS+=("$1")
+  printf '  %s %s\n' "$(c_red '✘')" "$1"
+  [[ $# -gt 1 ]] && printf '     %s\n' "$(c_dim "$2")"
+}
+
+cleanup() {
+  if [[ $KEEP -eq 0 ]]; then
+    step "Stopping containers"
+    docker compose down --remove-orphans >/dev/null 2>&1 || true
+  else
+    printf '\n%s\n' "$(c_dim 'Containers left running (--keep). Stop with: docker compose down')"
+  fi
+}
+trap cleanup EXIT
+
+# --- request helper -----------------------------------------------------------
+# Runs curl; sets globals: STATUS, BODY. Also prints a compact request/response
+# trace so you can see every exchange the script makes.
+http() {
+  local method="$1" path="$2"
+  shift 2
+
+  # Pull out the JSON body (last -d argument), and collect non-Authorization
+  # headers worth showing (Idempotency-Key, Content-Type).
+  local body_in='' headers_shown=()
+  local args=("$@") i
+  for ((i = 0; i < ${#args[@]}; i++)); do
+    case "${args[$i]}" in
+      -d) body_in="${args[$((i + 1))]}"; i=$((i + 1)) ;;
+      -H)
+        case "${args[$((i + 1))]}" in
+          Authorization:*) ;;
+          *) headers_shown+=("${args[$((i + 1))]}") ;;
+        esac
+        i=$((i + 1))
+        ;;
+    esac
+  done
+
+  printf '  %s %s %s' "$(c_dim '→')" "$(c_dim "$method")" "$(c_dim "$path")"
+  for h in "${headers_shown[@]}"; do printf ' %s' "$(c_dim "[$h]")"; done
+  [[ -n "$body_in" ]] && printf ' %s' "$(c_dim "$body_in")"
+  printf '\n'
+
+  local tmp
+  tmp=$(mktemp)
+  STATUS=$(curl -sS -o "$tmp" -w '%{http_code}' -X "$method" "$BASE_URL$path" "$@")
+  BODY=$(cat "$tmp")
+  rm -f "$tmp"
+
+  local body_out="$BODY"
+  [[ ${#body_out} -gt 200 ]] && body_out="${body_out:0:200}…"
+  printf '  %s %s %s\n' "$(c_dim '←')" "$(c_dim "$STATUS")" "$(c_dim "$body_out")"
+}
+
+# Extract a JSON field from $BODY (or any JSON string). Supports flat keys and
+# the dotted form "error.code"; for dotted keys we just look up the leaf, which
+# is fine because our error responses only carry one "code" field.
+# Works on strings, integers, booleans, null. Returns empty on miss.
+json_get() {
+  local key="$1" json="$2"
+  local leaf="${key##*.}"
+  printf '%s' "$json" \
+    | grep -oE "\"$leaf\"[[:space:]]*:[[:space:]]*(\"[^\"]*\"|-?[0-9]+(\.[0-9]+)?|true|false|null)" \
+    | head -n1 \
+    | sed -E "s/^\"$leaf\"[[:space:]]*:[[:space:]]*//; s/^\"(.*)\"$/\1/"
+}
+
+assert_status() {
+  local want="$1" got="$2" label="$3"
+  if [[ "$got" == "$want" ]]; then
+    pass "$label (HTTP $got)"
+  else
+    fail "$label" "expected HTTP $want, got $got; body: $BODY"
+  fi
+}
+
+assert_eq() {
+  local want="$1" got="$2" label="$3"
+  if [[ "$want" == "$got" ]]; then
+    pass "$label"
+  else
+    fail "$label" "expected '$want', got '$got'"
+  fi
+}
+
+# --- bring up the stack -------------------------------------------------------
+cd "$(dirname "$0")/.."
+
+if [[ $FRESH -eq 1 ]]; then
+  step "Wiping volumes (--fresh)"
+  docker compose down -v --remove-orphans >/dev/null 2>&1 || true
+fi
+
+step "Building images"
+docker compose build >/dev/null
+
+step "Starting database (waiting for healthy)"
+if ! docker compose up -d --wait db; then
+  printf '\n%s\n' "$(c_red 'Database failed to become healthy.')"
+  printf '%s\n' "$(c_dim 'Recent db logs:')"
+  docker compose logs --tail=30 db 2>&1 | sed 's/^/    /'
+  printf '\n%s\n' "$(c_dim 'If you see PANIC / "invalid checkpoint record" / "database system is shut down" repeating, the postgres volume is corrupted from a prior unclean shutdown. Re-run with --fresh to wipe it:')"
+  printf '%s\n' "    bin/e2e --fresh"
+  exit 1
+fi
+
+step "Installing gems (idempotent — fast when the bundle volume is warm)"
+docker compose run --rm -T web bundle install >/dev/null
+
+step "Resetting database (db:drop db:prepare for a clean slate)"
+docker compose run --rm -T web bin/rails db:drop db:prepare >/dev/null
+
+step "Minting operator JWT"
+TOKEN=$(docker compose run --rm -T web bin/rails operator:token 2>/dev/null | tr -d '\r' | tail -n 1)
+if [[ -z "$TOKEN" ]]; then
+  printf '%s\n' "$(c_red 'Failed to mint operator token')" >&2
+  exit 1
+fi
+printf '  token: %s...\n' "${TOKEN:0:32}"
+
+step "Starting web server"
+docker compose up -d web >/dev/null
+
+# wait for /up to answer 200
+ready=0
+for _ in $(seq 1 60); do
+  if [[ "$(curl -sS -o /dev/null -w '%{http_code}' "$BASE_URL/up" || true)" == "200" ]]; then
+    ready=1
+    break
+  fi
+  sleep 1
+done
+if [[ $ready -ne 1 ]]; then
+  printf '%s\n' "$(c_red 'Web service did not respond on /up within 60s')" >&2
+  docker compose logs --tail=30 web 2>&1 | sed 's/^/    /'
+  exit 1
+fi
+
+AUTH=(-H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json")
+
+# --- 1. Create user -----------------------------------------------------------
+step "1. Create user"
+
+http POST /api/v1/users "${AUTH[@]}" -d '{"email":"alice@example.com"}'
+assert_status 201 "$STATUS" "create alice"
+ALICE_ID=$(json_get id "$BODY")
+assert_eq "alice@example.com" "$(json_get email "$BODY")" "alice email echoed back"
+
+http POST /api/v1/users "${AUTH[@]}" -d '{"email":"bob@example.com"}'
+assert_status 201 "$STATUS" "create bob"
+BOB_ID=$(json_get id "$BODY")
+
+http POST /api/v1/users "${AUTH[@]}" -d '{"email":"alice@example.com"}'
+assert_status 409 "$STATUS" "duplicate email rejected"
+assert_eq "email_taken" "$(json_get error.code "$BODY")" "  → error.code is email_taken"
+
+http POST /api/v1/users "${AUTH[@]}" -d '{"email":"not-an-email"}'
+assert_status 422 "$STATUS" "invalid email rejected"
+
+http POST /api/v1/users -H "Content-Type: application/json" -d '{"email":"x@y.z"}'
+assert_status 401 "$STATUS" "unauthenticated rejected"
+
+# --- 2. Get balance -----------------------------------------------------------
+step "2. Get balance"
+
+http GET "/api/v1/users/$ALICE_ID/balance" "${AUTH[@]}"
+assert_status 200 "$STATUS" "fetch alice balance"
+assert_eq "0" "$(json_get amount "$BODY")" "  → amount is 0"
+
+http GET "/api/v1/users/999999/balance" "${AUTH[@]}"
+assert_status 404 "$STATUS" "missing user → 404"
+
+# --- 3. Top up / debit --------------------------------------------------------
+step "3. Top up / debit"
+
+IDEM_TOPUP="e2e-topup-$(date +%s)-$$"
+
+http POST "/api/v1/users/$ALICE_ID/balance_transactions" \
+  "${AUTH[@]}" -H "Idempotency-Key: $IDEM_TOPUP" \
+  -d '{"amount":5000}'
+assert_status 201 "$STATUS" "top up 5000"
+TXN_ID=$(json_get id "$BODY")
+assert_eq "5000" "$(json_get ending_amount "$BODY")" "  → ending_amount is 5000"
+
+http POST "/api/v1/users/$ALICE_ID/balance_transactions" \
+  "${AUTH[@]}" -H "Idempotency-Key: $IDEM_TOPUP" \
+  -d '{"amount":5000}'
+assert_status 201 "$STATUS" "idempotent replay returns cached response"
+assert_eq "$TXN_ID" "$(json_get id "$BODY")" "  → same txn id"
+
+http POST "/api/v1/users/$ALICE_ID/balance_transactions" \
+  "${AUTH[@]}" -H "Idempotency-Key: $IDEM_TOPUP" \
+  -d '{"amount":1}'
+assert_status 409 "$STATUS" "idempotency conflict on body change"
+assert_eq "idempotency_conflict" "$(json_get error.code "$BODY")" "  → error.code is idempotency_conflict"
+
+http POST "/api/v1/users/$ALICE_ID/balance_transactions" \
+  "${AUTH[@]}" -d '{"amount":-2000}'
+assert_status 201 "$STATUS" "debit 2000"
+assert_eq "3000" "$(json_get ending_amount "$BODY")" "  → ending_amount is 3000"
+
+http POST "/api/v1/users/$ALICE_ID/balance_transactions" \
+  "${AUTH[@]}" -d '{"amount":-999999}'
+assert_status 422 "$STATUS" "overdraft rejected"
+assert_eq "insufficient_funds" "$(json_get error.code "$BODY")" "  → error.code is insufficient_funds"
+
+http POST "/api/v1/users/$ALICE_ID/balance_transactions" \
+  "${AUTH[@]}" -H "Idempotency-Key: $(printf '%.0sx' {1..100})" \
+  -d '{"amount":1}'
+assert_status 400 "$STATUS" "oversized idempotency key rejected"
+assert_eq "malformed_idempotency_key" "$(json_get error.code "$BODY")" "  → error.code is malformed_idempotency_key"
+
+# --- 4. Transfer --------------------------------------------------------------
+step "4. Transfer between users"
+
+IDEM_XFER="e2e-xfer-$(date +%s)-$$"
+
+http POST /api/v1/transfers \
+  "${AUTH[@]}" -H "Idempotency-Key: $IDEM_XFER" \
+  -d "{\"from_user_id\":$ALICE_ID,\"to_user_id\":$BOB_ID,\"amount\":1000}"
+assert_status 201 "$STATUS" "transfer 1000 alice → bob"
+assert_eq "2000" "$(json_get from_ending_amount "$BODY")" "  → alice ending 2000"
+assert_eq "1000" "$(json_get to_ending_amount   "$BODY")" "  → bob ending 1000"
+
+http GET "/api/v1/users/$ALICE_ID/balance" "${AUTH[@]}"
+assert_eq "2000" "$(json_get amount "$BODY")" "alice balance now 2000"
+
+http GET "/api/v1/users/$BOB_ID/balance" "${AUTH[@]}"
+assert_eq "1000" "$(json_get amount "$BODY")" "bob balance now 1000"
+
+http POST /api/v1/transfers \
+  "${AUTH[@]}" -d "{\"from_user_id\":$ALICE_ID,\"to_user_id\":$BOB_ID,\"amount\":999999}"
+assert_status 422 "$STATUS" "transfer beyond balance rejected"
+assert_eq "insufficient_funds" "$(json_get error.code "$BODY")" "  → error.code is insufficient_funds"
+
+http POST /api/v1/transfers \
+  "${AUTH[@]}" -d "{\"from_user_id\":$ALICE_ID,\"to_user_id\":999999,\"amount\":1}"
+assert_status 422 "$STATUS" "transfer to missing user rejected"
+assert_eq "user_not_found" "$(json_get error.code "$BODY")" "  → error.code is user_not_found"
+
+# --- summary ------------------------------------------------------------------
+TOTAL=$((PASS + FAIL))
+printf '\n\033[1m=== %d/%d checks passed ===\033[0m\n' "$PASS" "$TOTAL"
+if [[ $FAIL -gt 0 ]]; then
+  printf '%s\n' "$(c_red 'Failed:')"
+  for t in "${FAILED_TESTS[@]}"; do printf '  - %s\n' "$t"; done
+  exit 1
+fi
+printf '%s\n' "$(c_green 'All good.')"
