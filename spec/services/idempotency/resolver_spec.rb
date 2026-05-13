@@ -4,13 +4,17 @@ RSpec.describe Idempotency::Resolver do
   let(:key)  { "test-key-#{SecureRandom.hex(4)}" }
   let(:body) { '{"amount":5000}' }
 
-  def request_for(headers: { "Idempotency-Key" => key }, method: "POST",
-                  path: "/api/v1/users/1/balance_transactions", raw_post: body)
+  def request_for(
+    headers: { "Idempotency-Key" => key },
+    method: "POST",
+    path: "/api/v1/users/1/balance_transactions",
+    raw_post: body
+  )
     Struct.new(:headers, :method, :path, :raw_post).new(headers, method, path, raw_post)
   end
 
-  def request_hash_for(method: "POST", path: "/api/v1/users/1/balance_transactions", raw_post: body)
-    Digest::SHA256.hexdigest("#{method}\n#{path}\n#{raw_post}")
+  def request_hash_for(**opts)
+    Idempotency::Resolver.request_hash(request_for(**opts))
   end
 
   describe ".call" do
@@ -29,7 +33,10 @@ RSpec.describe Idempotency::Resolver do
 
     context "with a blank Idempotency-Key" do
       it "returns :malformed without yielding" do
-        result = described_class.call(request_for(headers: { "Idempotency-Key" => "" })) { raise "should not yield" }
+        result = described_class.call(request_for(headers: { "Idempotency-Key" => "" })) {
+          raise "should not yield"
+        }
+
         expect(result.action).to eq(:malformed)
       end
     end
@@ -45,6 +52,7 @@ RSpec.describe Idempotency::Resolver do
       it "yields, completes the record, and returns :proceed" do
         result = described_class.call(request_for) { [ 201, '{"id":1}' ] }
         expect(result.action).to eq(:proceed)
+
         record = IdempotencyKey.find_by!(key: key)
         expect(record).to be_completed
         expect(record.response_status).to eq(201)

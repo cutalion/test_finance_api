@@ -20,11 +20,11 @@ module Idempotency
       return bypass(&action) if key.nil?
       return Result.new(action: :malformed) if key.blank? || key.length > IdempotencyKey::KEY_MAX_LENGTH
 
-      request_hash = fingerprint(request)
-      record, created = IdempotencyKey.claim(key: key, request_hash: request_hash)
+      hash = request_hash(request)
+      record, created = IdempotencyKey.claim(key: key, request_hash: hash)
 
       if record.completed?
-        return record.matches?(request_hash) ? replay(record) : conflict
+        return record.matches?(hash) ? replay(record) : conflict
       end
 
       # Row exists but is not completed: another request owns this key. We do
@@ -36,10 +36,9 @@ module Idempotency
       Result.new(action: :proceed)
     end
 
-    def self.fingerprint(request)
+    def self.request_hash(request)
       Digest::SHA256.hexdigest("#{request.method}\n#{request.path}\n#{request.raw_post}")
     end
-    private_class_method :fingerprint
 
     def self.bypass(&action)
       action.call
