@@ -1,27 +1,19 @@
 require "rails_helper"
 
 RSpec.describe "POST /api/v1/transfers", type: :request do
-  let(:headers) do
-    {
-      "Authorization" => "Bearer #{JsonWebToken.encode(role: "operator")}",
-      "Content-Type"  => "application/json"
-    }
-  end
-
   let(:alice) { User.create!(email: "alice@example.com", amount: 17_500) }
   let(:bob)   { User.create!(email: "bob@example.com",   amount: 5_500) }
 
   it "creates a transfer and moves money between users" do
     expect {
       post "/api/v1/transfers",
-        params:  { from_user_id: alice.id, to_user_id: bob.id, amount: 2_500 }.to_json,
-        headers: headers
+        params: { from_user_id: alice.id, to_user_id: bob.id, amount: 2_500 },
+        headers: auth_headers, as: :json
     }.to change { Transfer.count }.by(1)
      .and change { BalanceTransaction.count }.by(2)
 
     expect(response).to have_http_status(:created)
-    body = JSON.parse(response.body)
-    expect(body).to match(
+    expect(json_body).to match(
       "id"                 => kind_of(Integer),
       "from_user_id"       => alice.id,
       "to_user_id"         => bob.id,
@@ -37,72 +29,63 @@ RSpec.describe "POST /api/v1/transfers", type: :request do
   it "returns 401 when Authorization header is missing" do
     expect {
       post "/api/v1/transfers",
-        params:  { from_user_id: alice.id, to_user_id: bob.id, amount: 100 }.to_json,
-        headers: { "Content-Type" => "application/json" }
+        params: { from_user_id: alice.id, to_user_id: bob.id, amount: 100 }, as: :json
     }.not_to change { Transfer.count }
 
-    expect(response).to have_http_status(:unauthorized)
-    expect(JSON.parse(response.body).dig("error", "code")).to eq("invalid_token")
+    expect(response).to have_error_code(:invalid_token).with_status(:unauthorized)
   end
 
   it "returns 422 user_not_found when from_user_id does not exist" do
     expect {
       post "/api/v1/transfers",
-        params:  { from_user_id: 999_999, to_user_id: bob.id, amount: 100 }.to_json,
-        headers: headers
+        params: { from_user_id: 999_999, to_user_id: bob.id, amount: 100 },
+        headers: auth_headers, as: :json
     }.not_to change { Transfer.count }
 
-    expect(response).to have_http_status(:unprocessable_content)
-    expect(JSON.parse(response.body).dig("error", "code")).to eq("user_not_found")
+    expect(response).to have_error_code(:user_not_found).with_status(:unprocessable_content)
   end
 
   it "returns 422 user_not_found when to_user_id does not exist" do
     post "/api/v1/transfers",
-      params:  { from_user_id: alice.id, to_user_id: 999_999, amount: 100 }.to_json,
-      headers: headers
+      params: { from_user_id: alice.id, to_user_id: 999_999, amount: 100 },
+      headers: auth_headers, as: :json
 
-    expect(response).to have_http_status(:unprocessable_content)
-    expect(JSON.parse(response.body).dig("error", "code")).to eq("user_not_found")
+    expect(response).to have_error_code(:user_not_found).with_status(:unprocessable_content)
   end
 
   it "returns 422 validation_failed when from and to are the same user" do
     expect {
       post "/api/v1/transfers",
-        params:  { from_user_id: alice.id, to_user_id: alice.id, amount: 100 }.to_json,
-        headers: headers
+        params: { from_user_id: alice.id, to_user_id: alice.id, amount: 100 },
+        headers: auth_headers, as: :json
     }.not_to change { Transfer.count }
 
-    expect(response).to have_http_status(:unprocessable_content)
-    body = JSON.parse(response.body)
-    expect(body.dig("error", "code")).to eq("validation_failed")
-    expect(body.dig("error", "details", "to_user_id")).to be_present
+    expect(response).to have_error_code(:validation_failed).with_status(:unprocessable_content)
+    expect(json_body.dig("error", "details", "to_user_id")).to be_present
   end
 
   it "returns 422 validation_failed for a zero amount" do
     post "/api/v1/transfers",
-      params:  { from_user_id: alice.id, to_user_id: bob.id, amount: 0 }.to_json,
-      headers: headers
+      params: { from_user_id: alice.id, to_user_id: bob.id, amount: 0 },
+      headers: auth_headers, as: :json
 
-    expect(response).to have_http_status(:unprocessable_content)
-    expect(JSON.parse(response.body).dig("error", "code")).to eq("validation_failed")
+    expect(response).to have_error_code(:validation_failed).with_status(:unprocessable_content)
   end
 
   it "returns 422 validation_failed for a negative amount" do
     post "/api/v1/transfers",
-      params:  { from_user_id: alice.id, to_user_id: bob.id, amount: -100 }.to_json,
-      headers: headers
+      params: { from_user_id: alice.id, to_user_id: bob.id, amount: -100 },
+      headers: auth_headers, as: :json
 
-    expect(response).to have_http_status(:unprocessable_content)
-    expect(JSON.parse(response.body).dig("error", "code")).to eq("validation_failed")
+    expect(response).to have_error_code(:validation_failed).with_status(:unprocessable_content)
   end
 
   it "returns 422 validation_failed when amount is missing" do
     post "/api/v1/transfers",
-      params:  { from_user_id: alice.id, to_user_id: bob.id }.to_json,
-      headers: headers
+      params: { from_user_id: alice.id, to_user_id: bob.id },
+      headers: auth_headers, as: :json
 
-    expect(response).to have_http_status(:unprocessable_content)
-    expect(JSON.parse(response.body).dig("error", "code")).to eq("validation_failed")
+    expect(response).to have_error_code(:validation_failed).with_status(:unprocessable_content)
   end
 
   it "returns 422 insufficient_funds when sender lacks funds" do
@@ -110,50 +93,47 @@ RSpec.describe "POST /api/v1/transfers", type: :request do
 
     expect {
       post "/api/v1/transfers",
-        params:  { from_user_id: alice.id, to_user_id: bob.id, amount: 500 }.to_json,
-        headers: headers
+        params: { from_user_id: alice.id, to_user_id: bob.id, amount: 500 },
+        headers: auth_headers, as: :json
     }.not_to change { Transfer.count }
 
-    expect(response).to have_http_status(:unprocessable_content)
-    body = JSON.parse(response.body)
-    expect(body.dig("error", "code")).to eq("insufficient_funds")
-    expect(body.dig("error", "details", "current_amount")).to eq(100)
-    expect(body.dig("error", "details", "requested")).to eq(500)
+    expect(response).to have_error_code(:insufficient_funds)
+      .with_status(:unprocessable_content)
+      .with_details(current_amount: 100, requested: 500)
   end
 
   context "with Idempotency-Key" do
-    let(:idempotency_headers) { headers.merge("Idempotency-Key" => "transfer-key-xyz789") }
+    let(:idempotency_headers) { auth_headers.merge("Idempotency-Key" => "transfer-key-xyz789") }
 
     it "replays the original response on a duplicate request" do
       post "/api/v1/transfers",
-        params:  { from_user_id: alice.id, to_user_id: bob.id, amount: 2_500 }.to_json,
-        headers: idempotency_headers
+        params: { from_user_id: alice.id, to_user_id: bob.id, amount: 2_500 },
+        headers: idempotency_headers, as: :json
       expect(response).to have_http_status(:created)
-      original_body = JSON.parse(response.body)
+      original_body = json_body
 
       expect {
         post "/api/v1/transfers",
-          params:  { from_user_id: alice.id, to_user_id: bob.id, amount: 2_500 }.to_json,
-          headers: idempotency_headers
+          params: { from_user_id: alice.id, to_user_id: bob.id, amount: 2_500 },
+          headers: idempotency_headers, as: :json
       }.not_to change { Transfer.count }
 
       expect(response).to have_http_status(:created)
-      expect(JSON.parse(response.body)).to eq(original_body)
+      expect(json_body).to eq(original_body)
     end
 
     it "returns 409 idempotency_conflict when key is reused with a different body" do
       post "/api/v1/transfers",
-        params:  { from_user_id: alice.id, to_user_id: bob.id, amount: 2_500 }.to_json,
-        headers: idempotency_headers
+        params: { from_user_id: alice.id, to_user_id: bob.id, amount: 2_500 },
+        headers: idempotency_headers, as: :json
 
       expect {
         post "/api/v1/transfers",
-          params:  { from_user_id: alice.id, to_user_id: bob.id, amount: 9_999 }.to_json,
-          headers: idempotency_headers
+          params: { from_user_id: alice.id, to_user_id: bob.id, amount: 9_999 },
+          headers: idempotency_headers, as: :json
       }.not_to change { Transfer.count }
 
-      expect(response).to have_http_status(:conflict)
-      expect(JSON.parse(response.body).dig("error", "code")).to eq("idempotency_conflict")
+      expect(response).to have_error_code(:idempotency_conflict).with_status(:conflict)
     end
   end
 end

@@ -1,33 +1,24 @@
 require "rails_helper"
 
 RSpec.describe "POST /api/v1/users/:id/balance_transactions", type: :request do
-  let(:headers) do
-    {
-      "Authorization" => "Bearer #{JsonWebToken.encode(role: "operator")}",
-      "Content-Type"  => "application/json",
-    }
-  end
-
   let(:user) { User.create!(email: "alice@example.com") }
 
   it "tops up a balance and returns 201 with the transaction" do
     expect {
       post "/api/v1/users/#{user.id}/balance_transactions",
-        params: { amount: 5000 }.to_json,
-        headers: headers
+        params: { amount: 5000 }, headers: auth_headers, as: :json
     }.to change { user.reload.amount }.from(0).to(5000)
 
     expect(response).to have_http_status(:created)
-    body = JSON.parse(response.body)
-    expect(body).to match(
+    expect(json_body).to match(
       "id"             => kind_of(Integer),
       "user_id"        => user.id,
       "amount"         => 5000,
       "ending_amount"  => 5000,
       "created_at"     => kind_of(String),
     )
-    expect(body["amount"]).to be_a(Integer)
-    expect(body["ending_amount"]).to be_a(Integer)
+    expect(json_body["amount"]).to be_a(Integer)
+    expect(json_body["ending_amount"]).to be_a(Integer)
   end
 
   it "debits a balance and returns 201 with a negative amount" do
@@ -35,13 +26,11 @@ RSpec.describe "POST /api/v1/users/:id/balance_transactions", type: :request do
 
     expect {
       post "/api/v1/users/#{user.id}/balance_transactions",
-        params: { amount: -3000 }.to_json,
-        headers: headers
+        params: { amount: -3000 }, headers: auth_headers, as: :json
     }.to change { user.reload.amount }.from(10000).to(7000)
 
     expect(response).to have_http_status(:created)
-    body = JSON.parse(response.body)
-    expect(body).to match(
+    expect(json_body).to match(
       "id"             => kind_of(Integer),
       "user_id"        => user.id,
       "amount"         => -3000,
@@ -53,47 +42,36 @@ RSpec.describe "POST /api/v1/users/:id/balance_transactions", type: :request do
   it "returns 401 when Authorization header is missing" do
     expect {
       post "/api/v1/users/#{user.id}/balance_transactions",
-        params: { amount: 5000 }.to_json,
-        headers: { "Content-Type" => "application/json" }
+        params: { amount: 5000 }, as: :json
     }.not_to change { BalanceTransaction.count }
 
-    expect(response).to have_http_status(:unauthorized)
-    expect(JSON.parse(response.body).dig("error", "code")).to eq("invalid_token")
+    expect(response).to have_error_code(:invalid_token).with_status(:unauthorized)
   end
 
   it "returns 404 user_not_found for an unknown user" do
     post "/api/v1/users/999999/balance_transactions",
-      params: { amount: 5000 }.to_json,
-      headers: headers
+      params: { amount: 5000 }, headers: auth_headers, as: :json
 
-    expect(response).to have_http_status(:not_found)
-    expect(JSON.parse(response.body)).to match(
-      "error" => { "code" => "user_not_found", "message" => kind_of(String) }
-    )
+    expect(response).to have_error_code(:user_not_found).with_status(:not_found)
   end
 
   it "returns 422 validation_failed for a zero amount" do
     expect {
       post "/api/v1/users/#{user.id}/balance_transactions",
-        params: { amount: 0 }.to_json,
-        headers: headers
+        params: { amount: 0 }, headers: auth_headers, as: :json
     }.not_to change { BalanceTransaction.count }
 
-    expect(response).to have_http_status(:unprocessable_content)
-    body = JSON.parse(response.body)
-    expect(body.dig("error", "code")).to eq("validation_failed")
-    expect(body.dig("error", "details", "amount")).to be_present
+    expect(response).to have_error_code(:validation_failed).with_status(:unprocessable_content)
+    expect(json_body.dig("error", "details", "amount")).to be_present
   end
 
   it "returns 422 validation_failed when amount is missing" do
     expect {
       post "/api/v1/users/#{user.id}/balance_transactions",
-        params: {}.to_json,
-        headers: headers
+        params: {}, headers: auth_headers, as: :json
     }.not_to change { BalanceTransaction.count }
 
-    expect(response).to have_http_status(:unprocessable_content)
-    expect(JSON.parse(response.body).dig("error", "code")).to eq("validation_failed")
+    expect(response).to have_error_code(:validation_failed).with_status(:unprocessable_content)
   end
 
   it "returns 422 insufficient_funds when debit would push balance negative" do
@@ -101,81 +79,69 @@ RSpec.describe "POST /api/v1/users/:id/balance_transactions", type: :request do
 
     expect {
       post "/api/v1/users/#{user.id}/balance_transactions",
-        params: { amount: -3000 }.to_json,
-        headers: headers
+        params: { amount: -3000 }, headers: auth_headers, as: :json
     }.not_to change { BalanceTransaction.count }
 
-    expect(response).to have_http_status(:unprocessable_content)
-    body = JSON.parse(response.body)
-    expect(body.dig("error", "code")).to eq("insufficient_funds")
-    expect(body.dig("error", "details", "current_amount")).to eq(1000)
-    expect(body.dig("error", "details", "requested")).to eq(-3000)
+    expect(response).to have_error_code(:insufficient_funds)
+      .with_status(:unprocessable_content)
+      .with_details(current_amount: 1000, requested: -3000)
   end
 
   context "with Idempotency-Key" do
-    let(:idempotency_headers) { headers.merge("Idempotency-Key" => "test-key-abc123") }
+    let(:idempotency_headers) { auth_headers.merge("Idempotency-Key" => "test-key-abc123") }
 
     it "replays the original response on a duplicate request" do
       post "/api/v1/users/#{user.id}/balance_transactions",
-        params: { amount: 5000 }.to_json,
-        headers: idempotency_headers
+        params: { amount: 5000 }, headers: idempotency_headers, as: :json
       expect(response).to have_http_status(:created)
-      original_body = JSON.parse(response.body)
+      original_body = json_body
 
       expect {
         post "/api/v1/users/#{user.id}/balance_transactions",
-          params: { amount: 5000 }.to_json,
-          headers: idempotency_headers
+          params: { amount: 5000 }, headers: idempotency_headers, as: :json
       }.not_to change { BalanceTransaction.count }
 
       expect(response).to have_http_status(:created)
-      expect(JSON.parse(response.body)).to eq(original_body)
+      expect(json_body).to eq(original_body)
       expect(user.reload.amount).to eq(5000)
     end
 
     it "rejects a blank Idempotency-Key with 400 malformed_idempotency_key" do
       post "/api/v1/users/#{user.id}/balance_transactions",
-        params:  { amount: 5000 }.to_json,
-        headers: headers.merge("Idempotency-Key" => "")
-      expect(response).to have_http_status(:bad_request)
-      expect(JSON.parse(response.body).dig("error", "code")).to eq("malformed_idempotency_key")
+        params: { amount: 5000 }, headers: auth_headers.merge("Idempotency-Key" => ""), as: :json
+
+      expect(response).to have_error_code(:malformed_idempotency_key).with_status(:bad_request)
     end
 
     it "rejects an overlong Idempotency-Key with 400 malformed_idempotency_key" do
       post "/api/v1/users/#{user.id}/balance_transactions",
-        params:  { amount: 5000 }.to_json,
-        headers: headers.merge("Idempotency-Key" => "x" * 33)
-      expect(response).to have_http_status(:bad_request)
-      expect(JSON.parse(response.body).dig("error", "code")).to eq("malformed_idempotency_key")
+        params: { amount: 5000 }, headers: auth_headers.merge("Idempotency-Key" => "x" * 33), as: :json
+
+      expect(response).to have_error_code(:malformed_idempotency_key).with_status(:bad_request)
     end
 
     it "replays a cached 4xx response (e.g. insufficient_funds) on retry" do
       post "/api/v1/users/#{user.id}/balance_transactions",
-        params:  { amount: -9999 }.to_json,
-        headers: idempotency_headers
+        params: { amount: -9999 }, headers: idempotency_headers, as: :json
       expect(response).to have_http_status(:unprocessable_content)
-      original_body = JSON.parse(response.body)
+      original_body = json_body
 
       post "/api/v1/users/#{user.id}/balance_transactions",
-        params:  { amount: -9999 }.to_json,
-        headers: idempotency_headers
+        params: { amount: -9999 }, headers: idempotency_headers, as: :json
       expect(response).to have_http_status(:unprocessable_content)
-      expect(JSON.parse(response.body)).to eq(original_body)
+      expect(json_body).to eq(original_body)
     end
 
     it "returns 409 idempotency_conflict when key is reused with a different body" do
       post "/api/v1/users/#{user.id}/balance_transactions",
-        params: { amount: 5000 }.to_json,
-        headers: idempotency_headers
+        params: { amount: 5000 }, headers: idempotency_headers, as: :json
 
       expect {
         post "/api/v1/users/#{user.id}/balance_transactions",
-          params: { amount: 9999 }.to_json,
-          headers: idempotency_headers
+          params: { amount: 9999 }, headers: idempotency_headers, as: :json
       }.not_to change { BalanceTransaction.count }
 
-      expect(response).to have_http_status(:conflict)
-      expect(JSON.parse(response.body).dig("error", "code")).to eq("idempotency_conflict")
+      expect(response).to have_error_code(:idempotency_conflict).with_status(:conflict)
     end
   end
 end
