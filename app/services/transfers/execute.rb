@@ -9,11 +9,9 @@ module Transfers
       to_user = User.find_by(id: to_user_id)
       raise Balance::Errors::UserNotFound unless to_user
 
-      first, second = [ from_user, to_user ].sort_by(&:id)
-
       ActiveRecord::Base.transaction do
-        first.lock!
-        second.lock!
+        [from_user, to_user].sort_by(&:id).each(&:lock!) # sort by id to ensure consistent locking order
+
         from_user.reload
         to_user.reload
 
