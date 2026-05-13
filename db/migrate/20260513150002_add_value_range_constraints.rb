@@ -6,13 +6,13 @@ class AddValueRangeConstraints < ActiveRecord::Migration[8.1]
   RESPONSE_BODY_MAX = 16_384
 
   def change
-    add_check_constraint :users, "amount <= #{MAX_AMOUNT}", name: "users_amount_within_limit"
+    add_check_constraint :users, "balance <= #{MAX_AMOUNT}", name: "users_balance_within_limit"
     add_check_constraint :users, "char_length(email) <= #{EMAIL_MAX}", name: "users_email_length"
 
     add_check_constraint :balance_transactions,
       "amount BETWEEN -#{MAX_AMOUNT} AND #{MAX_AMOUNT}", name: "btx_amount_within_limit"
     add_check_constraint :balance_transactions,
-      "ending_amount <= #{MAX_AMOUNT}", name: "btx_ending_within_limit"
+      "ending_balance <= #{MAX_AMOUNT}", name: "btx_ending_balance_within_limit"
 
     add_check_constraint :transfers,
       "amount <= #{MAX_AMOUNT}", name: "transfers_amount_within_limit"

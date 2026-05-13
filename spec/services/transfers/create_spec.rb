@@ -1,8 +1,8 @@
 require "rails_helper"
 
 RSpec.describe Transfers::Create do
-  let(:alice) { User.create!(email: "alice@example.com", amount: 10_000) }
-  let(:bob)   { User.create!(email: "bob@example.com",   amount: 2_000) }
+  let(:alice) { User.create!(email: "alice@example.com", balance: 10_000) }
+  let(:bob)   { User.create!(email: "bob@example.com",   balance: 2_000) }
 
   def call(**overrides)
     described_class.call(
@@ -25,14 +25,14 @@ RSpec.describe Transfers::Create do
       expect(transfer.to_user_id).to   eq(bob.id)
       expect(transfer.amount).to       eq(2_500)
 
-      expect(alice.reload.amount).to eq(7_500)
-      expect(bob.reload.amount).to   eq(4_500)
+      expect(alice.reload.balance).to eq(7_500)
+      expect(bob.reload.balance).to   eq(4_500)
 
       txns = BalanceTransaction.where(transfer_id: transfer.id).order(:user_id)
       expect(txns.size).to eq(2)
       expect(txns.map(&:amount).sort).to eq([ -2_500, 2_500 ])
-      expect(txns.find { |t| t.user_id == alice.id }.ending_amount).to eq(7_500)
-      expect(txns.find { |t| t.user_id == bob.id   }.ending_amount).to eq(4_500)
+      expect(txns.find { |t| t.user_id == alice.id }.ending_balance).to eq(7_500)
+      expect(txns.find { |t| t.user_id == bob.id   }.ending_balance).to eq(4_500)
     end
 
     shared_examples "validation error on :amount" do |amount|
@@ -59,18 +59,18 @@ RSpec.describe Transfers::Create do
     end
 
     it "fails with insufficient_funds and does not move money when sender is short" do
-      alice.update!(amount: 100)
+      alice.update!(balance: 100)
 
       result = call(amount: 500)
 
       expect(result).to be_failure
       base = result.errors.where(:base).first
       expect(base.type).to eq(:insufficient_funds)
-      expect(base.options[:current_amount]).to eq(100)
-      expect(base.options[:requested]).to      eq(500)
+      expect(base.options[:current_balance]).to eq(100)
+      expect(base.options[:requested]).to       eq(500)
 
-      expect(alice.reload.amount).to eq(100)
-      expect(bob.reload.amount).to   eq(2_000)
+      expect(alice.reload.balance).to eq(100)
+      expect(bob.reload.balance).to   eq(2_000)
       expect(Transfer.count).to eq(0)
       expect(BalanceTransaction.count).to eq(0)
     end
@@ -84,8 +84,8 @@ RSpec.describe Transfers::Create do
     end
 
     it "completes both transfers without deadlock and conserves money" do
-      alice = User.create!(email: "alice-concurrent@example.com", amount: 10_000)
-      bob   = User.create!(email: "bob-concurrent@example.com",   amount: 10_000)
+      alice = User.create!(email: "alice-concurrent@example.com", balance: 10_000)
+      bob   = User.create!(email: "bob-concurrent@example.com",   balance: 10_000)
 
       threads = [
         Thread.new {
@@ -101,9 +101,9 @@ RSpec.describe Transfers::Create do
       ]
       threads.each(&:join)
 
-      expect(alice.reload.amount).to eq(10_500)
-      expect(bob.reload.amount).to   eq(9_500)
-      expect(alice.amount + bob.amount).to eq(20_000)
+      expect(alice.reload.balance).to eq(10_500)
+      expect(bob.reload.balance).to   eq(9_500)
+      expect(alice.balance + bob.balance).to eq(20_000)
       expect(Transfer.count).to eq(2)
       expect(BalanceTransaction.count).to eq(4)
     end

@@ -9,12 +9,12 @@ module Balance
       def perform
         ActiveRecord::Base.transaction do
           user.lock!
-          new_balance = user.amount + amount # `amount` can be negative
+          new_balance = user.balance + amount # `amount` can be negative
           ensure_sufficient_funds!(new_balance)
           ensure_balance_within_limit!(new_balance)
 
-          user.update!(amount: new_balance)
-          user.balance_transactions.create!(amount: amount, ending_amount: new_balance)
+          user.update!(balance: new_balance)
+          user.balance_transactions.create!(amount: amount, ending_balance: new_balance)
         end
       end
 
@@ -34,13 +34,13 @@ module Balance
       def ensure_sufficient_funds!(new_balance)
         return unless new_balance.negative?
         fail!(:insufficient_funds, message: "Balance would go negative",
-              current_amount: user.amount, requested: amount)
+              current_balance: user.balance, requested: amount)
       end
 
       def ensure_balance_within_limit!(new_balance)
         return if new_balance <= Money::MAX_AMOUNT
         fail!(:balance_limit_exceeded, message: "Resulting balance would exceed the maximum",
-              current_amount: user.amount, requested: amount, limit: Money::MAX_AMOUNT)
+              current_balance: user.balance, requested: amount, limit: Money::MAX_AMOUNT)
       end
     end
   end

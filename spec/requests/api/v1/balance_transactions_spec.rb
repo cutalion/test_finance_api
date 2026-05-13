@@ -7,34 +7,34 @@ RSpec.describe "POST /api/v1/users/:id/balance_transactions", type: :request do
     expect {
       post "/api/v1/users/#{user.id}/balance_transactions",
         params: { amount: 5000 }, headers: auth_headers, as: :json
-    }.to change { user.reload.amount }.from(0).to(5000)
+    }.to change { user.reload.balance }.from(0).to(5000)
 
     expect(response).to have_http_status(:created)
     expect(json_body).to match(
       "id"             => kind_of(Integer),
       "user_id"        => user.id,
       "amount"         => 5000,
-      "ending_amount"  => 5000,
+      "ending_balance" => 5000,
       "created_at"     => kind_of(String),
     )
     expect(json_body["amount"]).to be_a(Integer)
-    expect(json_body["ending_amount"]).to be_a(Integer)
+    expect(json_body["ending_balance"]).to be_a(Integer)
   end
 
   it "debits a balance and returns 201 with a negative amount" do
-    user.update!(amount: 10000)
+    user.update!(balance: 10000)
 
     expect {
       post "/api/v1/users/#{user.id}/balance_transactions",
         params: { amount: -3000 }, headers: auth_headers, as: :json
-    }.to change { user.reload.amount }.from(10000).to(7000)
+    }.to change { user.reload.balance }.from(10000).to(7000)
 
     expect(response).to have_http_status(:created)
     expect(json_body).to match(
       "id"             => kind_of(Integer),
       "user_id"        => user.id,
       "amount"         => -3000,
-      "ending_amount"  => 7000,
+      "ending_balance" => 7000,
       "created_at"     => kind_of(String),
     )
   end
@@ -85,7 +85,7 @@ RSpec.describe "POST /api/v1/users/:id/balance_transactions", type: :request do
   end
 
   it "returns 422 balance_limit_exceeded when credit would push balance over the limit" do
-    user.update!(amount: Money::MAX_AMOUNT - 1)
+    user.update!(balance: Money::MAX_AMOUNT - 1)
 
     expect {
       post "/api/v1/users/#{user.id}/balance_transactions",
@@ -94,11 +94,11 @@ RSpec.describe "POST /api/v1/users/:id/balance_transactions", type: :request do
 
     expect(response).to have_error_code(:balance_limit_exceeded)
       .with_status(:unprocessable_content)
-      .with_details(current_amount: Money::MAX_AMOUNT - 1, requested: 100, limit: Money::MAX_AMOUNT)
+      .with_details(current_balance: Money::MAX_AMOUNT - 1, requested: 100, limit: Money::MAX_AMOUNT)
   end
 
   it "returns 422 insufficient_funds when debit would push balance negative" do
-    user.update!(amount: 1000)
+    user.update!(balance: 1000)
 
     expect {
       post "/api/v1/users/#{user.id}/balance_transactions",
@@ -107,7 +107,7 @@ RSpec.describe "POST /api/v1/users/:id/balance_transactions", type: :request do
 
     expect(response).to have_error_code(:insufficient_funds)
       .with_status(:unprocessable_content)
-      .with_details(current_amount: 1000, requested: -3000)
+      .with_details(current_balance: 1000, requested: -3000)
   end
 
   context "with Idempotency-Key" do
@@ -126,7 +126,7 @@ RSpec.describe "POST /api/v1/users/:id/balance_transactions", type: :request do
 
       expect(response).to have_http_status(:created)
       expect(json_body).to eq(original_body)
-      expect(user.reload.amount).to eq(5000)
+      expect(user.reload.balance).to eq(5000)
     end
 
     it "rejects a blank Idempotency-Key with 400 malformed_idempotency_key" do

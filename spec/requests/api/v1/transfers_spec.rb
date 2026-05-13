@@ -1,8 +1,8 @@
 require "rails_helper"
 
 RSpec.describe "POST /api/v1/transfers", type: :request do
-  let(:alice) { User.create!(email: "alice@example.com", amount: 17_500) }
-  let(:bob)   { User.create!(email: "bob@example.com",   amount: 5_500) }
+  let(:alice) { User.create!(email: "alice@example.com", balance: 17_500) }
+  let(:bob)   { User.create!(email: "bob@example.com",   balance: 5_500) }
 
   it "creates a transfer and moves money between users" do
     expect {
@@ -14,16 +14,16 @@ RSpec.describe "POST /api/v1/transfers", type: :request do
 
     expect(response).to have_http_status(:created)
     expect(json_body).to match(
-      "id"                 => kind_of(Integer),
-      "from_user_id"       => alice.id,
-      "to_user_id"         => bob.id,
-      "amount"             => 2_500,
-      "from_ending_amount" => 15_000,
-      "to_ending_amount"   => 8_000,
-      "created_at"         => kind_of(String),
+      "id"                  => kind_of(Integer),
+      "from_user_id"        => alice.id,
+      "to_user_id"          => bob.id,
+      "amount"              => 2_500,
+      "from_ending_balance" => 15_000,
+      "to_ending_balance"   => 8_000,
+      "created_at"          => kind_of(String),
     )
-    expect(alice.reload.amount).to eq(15_000)
-    expect(bob.reload.amount).to   eq(8_000)
+    expect(alice.reload.balance).to eq(15_000)
+    expect(bob.reload.balance).to   eq(8_000)
   end
 
   it "returns 401 when Authorization header is missing" do
@@ -90,8 +90,8 @@ RSpec.describe "POST /api/v1/transfers", type: :request do
   end
 
   it "returns 422 balance_limit_exceeded when recipient balance would exceed the limit" do
-    alice.update!(amount: 1_000)
-    bob.update!(amount: Money::MAX_AMOUNT - 100)
+    alice.update!(balance: 1_000)
+    bob.update!(balance: Money::MAX_AMOUNT - 100)
 
     expect {
       post "/api/v1/transfers",
@@ -101,7 +101,7 @@ RSpec.describe "POST /api/v1/transfers", type: :request do
 
     expect(response).to have_error_code(:balance_limit_exceeded)
       .with_status(:unprocessable_content)
-      .with_details(current_amount: Money::MAX_AMOUNT - 100, requested: 500, limit: Money::MAX_AMOUNT)
+      .with_details(current_balance: Money::MAX_AMOUNT - 100, requested: 500, limit: Money::MAX_AMOUNT)
   end
 
   it "returns 422 validation_failed when amount is missing" do
@@ -113,7 +113,7 @@ RSpec.describe "POST /api/v1/transfers", type: :request do
   end
 
   it "returns 422 insufficient_funds when sender lacks funds" do
-    alice.update!(amount: 100)
+    alice.update!(balance: 100)
 
     expect {
       post "/api/v1/transfers",
@@ -123,7 +123,7 @@ RSpec.describe "POST /api/v1/transfers", type: :request do
 
     expect(response).to have_error_code(:insufficient_funds)
       .with_status(:unprocessable_content)
-      .with_details(current_amount: 100, requested: 500)
+      .with_details(current_balance: 100, requested: 500)
   end
 
   context "with Idempotency-Key" do

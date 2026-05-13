@@ -21,11 +21,11 @@ module Api
 
       def serialize(txn)
         {
-          id:            txn.id,
-          user_id:       txn.user_id,
-          amount:        txn.amount,
-          ending_amount: txn.ending_amount,
-          created_at:    txn.created_at.iso8601
+          id:             txn.id,
+          user_id:        txn.user_id,
+          amount:         txn.amount,
+          ending_balance: txn.ending_balance,
+          created_at:     txn.created_at.iso8601
         }
       end
     end
