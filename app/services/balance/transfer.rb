@@ -1,17 +1,17 @@
-module Transfers
-  class Create < ApplicationService
-    attr_accessor :from_user, :to_user, :amount
+module Balance
+  class Transfer < ApplicationService
+    attr_accessor :from, :to, :amount
 
     validate :amount_must_be_positive_integer
     validate :amount_must_be_within_limit
     validate :users_must_differ
-    validate :from_user_must_exist
-    validate :to_user_must_exist
+    validate :from_must_exist
+    validate :to_must_exist
 
     def perform
       ActiveRecord::Base.transaction do
         # lock users in ascending order to avoid deadlocks
-        [ from_user, to_user ].sort_by(&:id).each(&:lock!)
+        [ from, to ].sort_by(&:id).each(&:lock!)
 
         ensure_sufficient_funds!
         ensure_recipient_balance_within_limit!
@@ -23,29 +23,29 @@ module Transfers
     private
 
     def ensure_sufficient_funds!
-      return if from_user.balance >= amount
+      return if from.balance >= amount
 
       fail!(:insufficient_funds, message: "Balance would go negative",
-            current_balance: from_user.balance, requested: amount)
+            current_balance: from.balance, requested: amount)
     end
 
     def ensure_recipient_balance_within_limit!
-      return if to_user.balance + amount <= Money::MAX_AMOUNT
+      return if to.balance + amount <= Money::MAX_AMOUNT
 
       fail!(:balance_limit_exceeded, message: "Recipient balance would exceed the maximum",
-            current_balance: to_user.balance, requested: amount, limit: Money::MAX_AMOUNT)
+            current_balance: to.balance, requested: amount, limit: Money::MAX_AMOUNT)
     end
 
     def apply_transfer!
-      new_from = from_user.balance - amount
-      new_to   = to_user.balance + amount
+      new_from = from.balance - amount
+      new_to   = to.balance + amount
 
-      from_user.update!(balance: new_from)
-      to_user.update!(balance: new_to)
+      from.update!(balance: new_from)
+      to.update!(balance: new_to)
 
       {
-        from_user_id:        from_user.id,
-        to_user_id:          to_user.id,
+        from_user_id:        from.id,
+        to_user_id:          to.id,
         amount:              amount,
         from_ending_balance: new_from,
         to_ending_balance:   new_to
@@ -64,16 +64,16 @@ module Transfers
     end
 
     def users_must_differ
-      return unless from_user && to_user
-      errors.add(:to_user_id, "must differ from from_user_id") if from_user.id == to_user.id
+      return unless from && to
+      errors.add(:to_user_id, "must differ from from_user_id") if from.id == to.id
     end
 
-    def from_user_must_exist
-      errors.add(:base, :user_not_found, message: "User not found") unless from_user.present?
+    def from_must_exist
+      errors.add(:base, :user_not_found, message: "User not found") unless from.present?
     end
 
-    def to_user_must_exist
-      errors.add(:base, :user_not_found, message: "User not found") unless to_user.present?
+    def to_must_exist
+      errors.add(:base, :user_not_found, message: "User not found") unless to.present?
     end
   end
 end

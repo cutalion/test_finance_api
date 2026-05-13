@@ -1,14 +1,14 @@
 require "rails_helper"
 
-RSpec.describe Transfers::Create do
+RSpec.describe Balance::Transfer do
   let(:alice) { User.create!(email: "alice@example.com", balance: 10_000) }
   let(:bob)   { User.create!(email: "bob@example.com",   balance: 2_000) }
 
   def call(**overrides)
     described_class.call(
-      from_user: alice,
-      to_user:   bob,
-      amount:    2_500,
+      from:   alice,
+      to:     bob,
+      amount: 2_500,
       **overrides,
     )
   end
@@ -46,7 +46,7 @@ RSpec.describe Transfers::Create do
     include_examples "validation error on :amount", "2500"
 
     it "rejects same-user transfers" do
-      result = call(to_user: alice)
+      result = call(to: alice)
 
       expect(result).to be_failure
       expect(result.errors[:to_user_id]).to be_present
@@ -82,12 +82,12 @@ RSpec.describe Transfers::Create do
       threads = [
         Thread.new {
           ActiveRecord::Base.connection_pool.with_connection {
-            described_class.call(from_user: alice, to_user: bob, amount: 1_000)
+            described_class.call(from: alice, to: bob, amount: 1_000)
           }
         },
         Thread.new {
           ActiveRecord::Base.connection_pool.with_connection {
-            described_class.call(from_user: bob, to_user: alice, amount: 1_500)
+            described_class.call(from: bob, to: alice, amount: 1_500)
           }
         }
       ]
