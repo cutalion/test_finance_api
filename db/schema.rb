@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_13_150000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_13_150001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "citext"
   enable_extension "pg_catalog.plpgsql"
@@ -22,6 +22,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_13_150000) do
     t.bigint "transfer_id"
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
+    t.index ["transfer_id"], name: "index_balance_transactions_on_transfer_id"
     t.index ["user_id", "created_at"], name: "index_balance_transactions_on_user_id_and_created_at"
     t.index ["user_id"], name: "index_balance_transactions_on_user_id"
     t.check_constraint "amount <> 0", name: "btx_amount_nonzero"
@@ -44,6 +45,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_13_150000) do
     t.index ["key"], name: "index_idempotency_keys_on_key", unique: true
   end
 
+  create_table "transfers", force: :cascade do |t|
+    t.bigint "amount", null: false
+    t.datetime "created_at", null: false
+    t.bigint "from_user_id", null: false
+    t.bigint "to_user_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["from_user_id"], name: "index_transfers_on_from_user_id"
+    t.index ["to_user_id"], name: "index_transfers_on_to_user_id"
+    t.check_constraint "amount > 0", name: "transfers_amount_positive"
+    t.check_constraint "from_user_id <> to_user_id", name: "transfers_distinct_users"
+  end
+
   create_table "users", force: :cascade do |t|
     t.bigint "amount", default: 0, null: false
     t.datetime "created_at", null: false
@@ -53,5 +66,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_13_150000) do
     t.check_constraint "amount >= 0", name: "users_amount_non_negative"
   end
 
+  add_foreign_key "balance_transactions", "transfers"
   add_foreign_key "balance_transactions", "users"
+  add_foreign_key "transfers", "users", column: "from_user_id"
+  add_foreign_key "transfers", "users", column: "to_user_id"
 end
