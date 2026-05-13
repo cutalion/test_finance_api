@@ -30,7 +30,7 @@ docker compose run --rm web bundle exec rspec
 export TOKEN=$(docker compose run --rm -T web bin/rails operator:token | tr -d '\r' | tail -n 1)
 
 # 5. Start the server (http://localhost:3000)
-docker compose up
+docker compose up -d
 ```
 
 ### Short curl walkthrough
