@@ -23,29 +23,29 @@ module Transfers
     private
 
     def ensure_sufficient_funds!
-      return if from_user.amount >= amount
+      return if from_user.balance >= amount
 
       fail!(:insufficient_funds, message: "Balance would go negative",
-            current_amount: from_user.amount, requested: amount)
+            current_balance: from_user.balance, requested: amount)
     end
 
     def ensure_recipient_balance_within_limit!
-      return if to_user.amount + amount <= Money::MAX_AMOUNT
+      return if to_user.balance + amount <= Money::MAX_AMOUNT
 
       fail!(:balance_limit_exceeded, message: "Recipient balance would exceed the maximum",
-            current_amount: to_user.amount, requested: amount, limit: Money::MAX_AMOUNT)
+            current_balance: to_user.balance, requested: amount, limit: Money::MAX_AMOUNT)
     end
 
     def record_transfer!
-      new_from = from_user.amount - amount
-      new_to   = to_user.amount + amount
+      new_from = from_user.balance - amount
+      new_to   = to_user.balance + amount
 
       transfer = Transfer.create!(from_user: from_user, to_user: to_user, amount: amount)
-      from_user.update!(amount: new_from)
-      to_user.update!(amount: new_to)
+      from_user.update!(balance: new_from)
+      to_user.update!(balance: new_to)
 
-      from_user.balance_transactions.create!(amount: -amount, ending_amount: new_from, transfer: transfer)
-      to_user.balance_transactions.create!(amount: amount, ending_amount: new_to, transfer: transfer)
+      from_user.balance_transactions.create!(amount: -amount, ending_balance: new_from, transfer: transfer)
+      to_user.balance_transactions.create!(amount: amount, ending_balance: new_to, transfer: transfer)
 
       transfer
     end

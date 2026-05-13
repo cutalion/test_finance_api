@@ -18,7 +18,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_13_150002) do
   create_table "balance_transactions", force: :cascade do |t|
     t.bigint "amount", null: false
     t.datetime "created_at", null: false
-    t.bigint "ending_amount", null: false
+    t.bigint "ending_balance", null: false
     t.bigint "transfer_id"
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
@@ -27,8 +27,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_13_150002) do
     t.index ["user_id"], name: "index_balance_transactions_on_user_id"
     t.check_constraint "amount <> 0", name: "btx_amount_nonzero"
     t.check_constraint "amount >= '-1000000000000'::bigint AND amount <= '1000000000000'::bigint", name: "btx_amount_within_limit"
-    t.check_constraint "ending_amount <= '1000000000000'::bigint", name: "btx_ending_within_limit"
-    t.check_constraint "ending_amount >= 0", name: "btx_ending_nonneg"
+    t.check_constraint "ending_balance <= '1000000000000'::bigint", name: "btx_ending_balance_within_limit"
+    t.check_constraint "ending_balance >= 0", name: "btx_ending_balance_nonneg"
   end
 
   create_table "idempotency_keys", force: :cascade do |t|
@@ -62,13 +62,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_13_150002) do
   end
 
   create_table "users", force: :cascade do |t|
-    t.bigint "amount", default: 0, null: false
+    t.bigint "balance", default: 0, null: false
     t.datetime "created_at", null: false
     t.citext "email", null: false
     t.datetime "updated_at", null: false
     t.index ["email"], name: "index_users_on_email", unique: true
-    t.check_constraint "amount <= '1000000000000'::bigint", name: "users_amount_within_limit"
-    t.check_constraint "amount >= 0", name: "users_amount_non_negative"
+    t.check_constraint "balance <= '1000000000000'::bigint", name: "users_balance_within_limit"
+    t.check_constraint "balance >= 0", name: "users_balance_non_negative"
     t.check_constraint "char_length(email::text) <= 255", name: "users_email_length"
   end
 

@@ -18,13 +18,13 @@ module Api
 
       def serialize(transfer)
         {
-          id:                 transfer.id,
-          from_user_id:       transfer.from_user_id,
-          to_user_id:         transfer.to_user_id,
-          amount:             transfer.amount,
-          from_ending_amount: transfer.from_balance_transaction.ending_amount,
-          to_ending_amount:   transfer.to_balance_transaction.ending_amount,
-          created_at:         transfer.created_at.iso8601
+          id:                  transfer.id,
+          from_user_id:        transfer.from_user_id,
+          to_user_id:          transfer.to_user_id,
+          amount:              transfer.amount,
+          from_ending_balance: transfer.from_balance_transaction.ending_balance,
+          to_ending_balance:   transfer.to_balance_transaction.ending_balance,
+          created_at:          transfer.created_at.iso8601
         }
       end
     end

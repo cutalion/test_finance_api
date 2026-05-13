@@ -43,6 +43,16 @@ Export it for use in subsequent calls:
 export TOKEN=<token printed above>
 ```
 
+## Demo
+
+`bin/e2e` walks through every endpoint with real `curl` calls so you can see request/response shapes without copy-pasting from the examples below. It builds the images, resets the database, boots the server, exercises the four endpoints (including idempotency and error paths), and tears the containers down on exit.
+
+```bash
+bin/e2e
+```
+
+Each step prints the request line, the response status and body, and a pass/fail check. Read the section below for the same shapes in isolation.
+
 ## API examples
 
 All examples assume the server is running (`docker compose up`) and `$TOKEN` is exported.
@@ -80,7 +90,7 @@ curl http://localhost:3000/api/v1/users/1/balance \
 ```json
 {
   "user_id": 1,
-  "amount": 12500
+  "balance": 12500
 }
 ```
 
@@ -102,7 +112,7 @@ curl -X POST http://localhost:3000/api/v1/users/1/balance_transactions \
   "id": 42,
   "user_id": 1,
   "amount": 5000,
-  "ending_amount": 17500,
+  "ending_balance": 17500,
   "created_at": "2026-05-13T10:22:00Z"
 }
 ```
@@ -122,7 +132,7 @@ curl -X POST http://localhost:3000/api/v1/users/1/balance_transactions \
   "error": {
     "code": "insufficient_funds",
     "message": "Balance would go negative",
-    "details": { "current_amount": 1000, "requested": -3000 }
+    "details": { "current_balance": 1000, "requested": -3000 }
   }
 }
 ```
@@ -146,8 +156,8 @@ curl -X POST http://localhost:3000/api/v1/transfers \
   "from_user_id": 1,
   "to_user_id": 2,
   "amount": 2500,
-  "from_ending_amount": 15000,
-  "to_ending_amount": 8000,
+  "from_ending_balance": 15000,
+  "to_ending_balance": 8000,
   "created_at": "2026-05-13T10:25:11Z"
 }
 ```
@@ -158,7 +168,7 @@ curl -X POST http://localhost:3000/api/v1/transfers \
   "error": {
     "code": "insufficient_funds",
     "message": "Sender balance would go negative",
-    "details": { "current_amount": 1000, "requested": 2500 }
+    "details": { "current_balance": 1000, "requested": 2500 }
   }
 }
 ```
