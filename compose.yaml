@@ -31,6 +31,7 @@ services:
     environment:
       DB_HOST: db
       BINDING: 0.0.0.0
+      JWT_SECRET: dev-smoke-test-secret
     depends_on:
       db:
         condition: service_healthy

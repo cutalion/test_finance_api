@@ -22,7 +22,7 @@ module Api
         {
           from_user_id: params.require(:from_user_id),
           to_user_id:   params.require(:to_user_id),
-          amount:       params.require(:amount),
+          amount:       params.require(:amount)
         }
       end
 
@@ -36,7 +36,7 @@ module Api
           amount:             transfer.amount,
           from_ending_amount: from_btx.ending_amount,
           to_ending_amount:   to_btx.ending_amount,
-          created_at:         transfer.created_at.iso8601,
+          created_at:         transfer.created_at.iso8601
         }
       end
     end
