@@ -48,7 +48,7 @@ module Transfers
         to_user_id:          to_user.id,
         amount:              amount,
         from_ending_balance: new_from,
-        to_ending_balance:   new_to,
+        to_ending_balance:   new_to
       }
     end
 
