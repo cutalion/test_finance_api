@@ -43,7 +43,7 @@ RSpec.describe Idempotency::Resolver do
 
     context "with an overlong Idempotency-Key" do
       it "returns :malformed without yielding" do
-        result = described_class.call(request_for(headers: { "Idempotency-Key" => "x" * 33 })) { raise "should not yield" }
+        result = described_class.call(request_for(headers: { "Idempotency-Key" => "x" * 41 })) { raise "should not yield" }
         expect(result.action).to eq(:malformed)
       end
     end

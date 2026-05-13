@@ -1,5 +1,5 @@
 class IdempotencyKey < ApplicationRecord
-  KEY_MAX_LENGTH = 32
+  KEY_MAX_LENGTH = 40
   EXPIRATION_TIME = 24.hours
 
   # Returns [record, created] where created is true if this call inserted the row.
