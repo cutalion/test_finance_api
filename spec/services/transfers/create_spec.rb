@@ -1,16 +1,24 @@
 require "rails_helper"
 
-RSpec.describe Transfers::Execute do
+RSpec.describe Transfers::Create do
   let(:alice) { User.create!(email: "alice@example.com", amount: 10_000) }
   let(:bob)   { User.create!(email: "bob@example.com",   amount: 2_000) }
 
+  def call(**overrides)
+    described_class.call(
+      from_user: alice,
+      to_user:   bob,
+      amount:    2_500,
+      **overrides,
+    )
+  end
+
   describe ".call" do
     it "moves money from sender to recipient and creates paired ledger rows" do
-      transfer = described_class.call(
-        from_user_id: alice.id,
-        to_user_id:   bob.id,
-        amount:       2_500,
-      )
+      result = call
+
+      expect(result).to be_success
+      transfer = result.payload
 
       expect(transfer).to be_persisted
       expect(transfer.from_user_id).to eq(alice.id)
@@ -27,56 +35,39 @@ RSpec.describe Transfers::Execute do
       expect(txns.find { |t| t.user_id == bob.id   }.ending_amount).to eq(4_500)
     end
 
-    it "raises InvalidAmount for zero amount" do
-      expect {
-        described_class.call(from_user_id: alice.id, to_user_id: bob.id, amount: 0)
-      }.to raise_error(Transfers::Errors::InvalidAmount)
+    shared_examples "validation error on :amount" do |amount|
+      it "is invalid for amount=#{amount.inspect}" do
+        result = call(amount: amount)
 
-      expect(Transfer.count).to eq(0)
-      expect(BalanceTransaction.count).to eq(0)
+        expect(result).to be_failure
+        expect(result.errors[:amount]).to be_present
+        expect(Transfer.count).to eq(0)
+        expect(BalanceTransaction.count).to eq(0)
+      end
     end
 
-    it "raises InvalidAmount for a negative amount" do
-      expect {
-        described_class.call(from_user_id: alice.id, to_user_id: bob.id, amount: -100)
-      }.to raise_error(Transfers::Errors::InvalidAmount)
-    end
+    include_examples "validation error on :amount", 0
+    include_examples "validation error on :amount", -100
+    include_examples "validation error on :amount", "2500"
 
-    it "raises InvalidAmount for a non-integer amount" do
-      expect {
-        described_class.call(from_user_id: alice.id, to_user_id: bob.id, amount: "2500")
-      }.to raise_error(Transfers::Errors::InvalidAmount)
-    end
+    it "rejects same-user transfers" do
+      result = call(to_user: alice)
 
-    it "raises SameUser when from and to are identical" do
-      expect {
-        described_class.call(from_user_id: alice.id, to_user_id: alice.id, amount: 100)
-      }.to raise_error(Transfers::Errors::SameUser)
-
+      expect(result).to be_failure
+      expect(result.errors[:to_user_id]).to be_present
       expect(Transfer.count).to eq(0)
     end
 
-    it "raises UserNotFound when sender does not exist" do
-      expect {
-        described_class.call(from_user_id: 999_999, to_user_id: bob.id, amount: 100)
-      }.to raise_error(Balance::Errors::UserNotFound)
-    end
-
-    it "raises UserNotFound when recipient does not exist" do
-      expect {
-        described_class.call(from_user_id: alice.id, to_user_id: 999_999, amount: 100)
-      }.to raise_error(Balance::Errors::UserNotFound)
-    end
-
-    it "raises InsufficientFunds and does not move money when sender is short" do
+    it "fails with insufficient_funds and does not move money when sender is short" do
       alice.update!(amount: 100)
 
-      expect {
-        described_class.call(from_user_id: alice.id, to_user_id: bob.id, amount: 500)
-      }.to raise_error(Balance::Errors::InsufficientFunds) { |e|
-        expect(e.current_amount).to eq(100)
-        expect(e.requested).to      eq(500)
-      }
+      result = call(amount: 500)
+
+      expect(result).to be_failure
+      base = result.errors.where(:base).first
+      expect(base.type).to eq(:insufficient_funds)
+      expect(base.options[:current_amount]).to eq(100)
+      expect(base.options[:requested]).to      eq(500)
 
       expect(alice.reload.amount).to eq(100)
       expect(bob.reload.amount).to   eq(2_000)
@@ -99,12 +90,12 @@ RSpec.describe Transfers::Execute do
       threads = [
         Thread.new {
           ActiveRecord::Base.connection_pool.with_connection {
-            described_class.call(from_user_id: alice.id, to_user_id: bob.id, amount: 1_000)
+            described_class.call(from_user: alice, to_user: bob, amount: 1_000)
           }
         },
         Thread.new {
           ActiveRecord::Base.connection_pool.with_connection {
-            described_class.call(from_user_id: bob.id, to_user_id: alice.id, amount: 1_500)
+            described_class.call(from_user: bob, to_user: alice, amount: 1_500)
           }
         }
       ]

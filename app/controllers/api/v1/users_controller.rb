@@ -2,16 +2,22 @@ module Api
   module V1
     class UsersController < ApplicationController
       def create
-        user = Users::Create.call(**user_params)
+        result = Users::Create.call(**user_params)
+        return render_failure(result) if result.failure?
+
+        user = result.payload
         render json: { id: user.id, email: user.email }, status: :created
-      rescue Users::Errors::EmailTaken => e
-        render_error(:conflict, "email_taken", e.message)
       end
 
       private
 
+      def render_failure(result)
+        status = result.errors.added?(:base, :email_taken) ? :conflict : :unprocessable_content
+        render_service_failure(result, status: status)
+      end
+
       def user_params
-        { email: params.require(:email) }
+        params.permit(:email).to_h.symbolize_keys
       end
     end
   end
