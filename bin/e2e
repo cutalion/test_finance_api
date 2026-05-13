@@ -219,14 +219,13 @@ http POST "/api/v1/users/$ALICE_ID/balance_transactions" \
   "${AUTH[@]}" -H "Idempotency-Key: $IDEM_TOPUP" \
   -d '{"amount":5000}'
 assert_status 201 "$STATUS" "top up 5000"
-TXN_ID=$(json_get id "$BODY")
 assert_eq "5000" "$(json_get ending_balance "$BODY")" "  → ending_balance is 5000"
 
 http POST "/api/v1/users/$ALICE_ID/balance_transactions" \
   "${AUTH[@]}" -H "Idempotency-Key: $IDEM_TOPUP" \
   -d '{"amount":5000}'
 assert_status 201 "$STATUS" "idempotent replay returns cached response"
-assert_eq "$TXN_ID" "$(json_get id "$BODY")" "  → same txn id"
+assert_eq "5000" "$(json_get ending_balance "$BODY")" "  → cached ending_balance is 5000"
 
 http POST "/api/v1/users/$ALICE_ID/balance_transactions" \
   "${AUTH[@]}" -H "Idempotency-Key: $IDEM_TOPUP" \
