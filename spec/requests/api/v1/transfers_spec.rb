@@ -137,7 +137,7 @@ RSpec.describe "POST /api/v1/transfers", type: :request do
           headers: idempotency_headers
       }.not_to change { Transfer.count }
 
-      expect(response).to have_http_status(:ok)
+      expect(response).to have_http_status(:created)
       expect(JSON.parse(response.body)).to eq(original_body)
     end
 

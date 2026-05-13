@@ -36,9 +36,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_13_150001) do
     t.text "key", null: false
     t.datetime "locked_at", null: false
     t.text "request_hash", null: false
-    t.text "request_method", null: false
-    t.text "request_path", null: false
-    t.jsonb "response_body"
+    t.text "response_body"
     t.integer "response_status"
     t.datetime "updated_at", null: false
     t.index ["expires_at"], name: "index_idempotency_keys_on_expires_at"

@@ -8,25 +8,20 @@ module Idempotent
   private
 
   def handle_idempotency
-    key = request.headers["Idempotency-Key"]
-    return yield if key.blank?
-
-    body_hash = Digest::SHA256.hexdigest(request.raw_post)
-    result = Idempotency::Handle.call(
-      key:       key,
-      method:    request.method,
-      path:      request.path,
-      body_hash: body_hash,
-    )
+    result = Idempotency::Resolver.call(request) do
+      yield
+      [ response.status, response.body ]
+    end
 
     case result.action
     when :replay
-      render json: result.cached_body, status: :ok
+      render body: result.body, status: result.status, content_type: "application/json"
     when :conflict
       render_error(:conflict, "idempotency_conflict", "Idempotency key already used with a different request")
-    when :proceed
-      yield
-      result.record.complete!(status: response.status, body: response.body) if response.successful?
+    when :malformed
+      render_error(:bad_request, "malformed_idempotency_key",
+                   "Idempotency-Key must be 1-#{IdempotencyKey::KEY_MAX_LENGTH} characters")
     end
+    # :proceed and :bypass: Resolver already yielded the action.
   end
 end
