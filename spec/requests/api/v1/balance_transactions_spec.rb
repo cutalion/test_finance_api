@@ -128,9 +128,39 @@ RSpec.describe "POST /api/v1/users/:id/balance_transactions", type: :request do
           headers: idempotency_headers
       }.not_to change { BalanceTransaction.count }
 
-      expect(response).to have_http_status(:ok)
+      expect(response).to have_http_status(:created)
       expect(JSON.parse(response.body)).to eq(original_body)
       expect(user.reload.amount).to eq(5000)
+    end
+
+    it "rejects a blank Idempotency-Key with 400 malformed_idempotency_key" do
+      post "/api/v1/users/#{user.id}/balance_transactions",
+        params:  { amount: 5000 }.to_json,
+        headers: headers.merge("Idempotency-Key" => "")
+      expect(response).to have_http_status(:bad_request)
+      expect(JSON.parse(response.body).dig("error", "code")).to eq("malformed_idempotency_key")
+    end
+
+    it "rejects an overlong Idempotency-Key with 400 malformed_idempotency_key" do
+      post "/api/v1/users/#{user.id}/balance_transactions",
+        params:  { amount: 5000 }.to_json,
+        headers: headers.merge("Idempotency-Key" => "x" * 33)
+      expect(response).to have_http_status(:bad_request)
+      expect(JSON.parse(response.body).dig("error", "code")).to eq("malformed_idempotency_key")
+    end
+
+    it "replays a cached 4xx response (e.g. insufficient_funds) on retry" do
+      post "/api/v1/users/#{user.id}/balance_transactions",
+        params:  { amount: -9999 }.to_json,
+        headers: idempotency_headers
+      expect(response).to have_http_status(:unprocessable_content)
+      original_body = JSON.parse(response.body)
+
+      post "/api/v1/users/#{user.id}/balance_transactions",
+        params:  { amount: -9999 }.to_json,
+        headers: idempotency_headers
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(JSON.parse(response.body)).to eq(original_body)
     end
 
     it "returns 409 idempotency_conflict when key is reused with a different body" do
