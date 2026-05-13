@@ -1,9 +1,5 @@
 class ApplicationController < ActionController::API
-  Operator = Struct.new(:role)
-
   before_action :authenticate_operator!
-
-  attr_reader :current_operator
 
   private
 
@@ -14,8 +10,6 @@ class ApplicationController < ActionController::API
 
     payload = JsonWebToken.decode(token)
     raise JWT::DecodeError, "missing operator role" unless payload[:role] == "operator"
-
-    @current_operator = Operator.new(payload[:role])
   rescue JWT::DecodeError
     render_error(:unauthorized, "invalid_token", "Token is missing or invalid")
   end
