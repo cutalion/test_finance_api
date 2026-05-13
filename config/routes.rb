@@ -7,6 +7,7 @@ Rails.application.routes.draw do
         resource :balance, only: [:show]
         resources :balance_transactions, only: [:create]
       end
+      resources :transfers, only: [:create]
     end
   end
 end
