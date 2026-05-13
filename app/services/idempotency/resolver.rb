@@ -1,4 +1,9 @@
 module Idempotency
+  # Postgres-backed for simplicity — the goal here is to demonstrate the
+  # idempotency mechanism, not to be fast. In production we'd cache responses
+  # in Redis (lower latency, TTL eviction for free) and likely lift the whole
+  # check into middleware or an upstream layer (API gateway / edge) so the
+  # Rails stack isn't touched on replays at all.
   class Resolver
     Result = Struct.new(:action, :status, :body, keyword_init: true)
 
