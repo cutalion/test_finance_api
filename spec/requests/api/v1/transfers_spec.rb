@@ -4,7 +4,7 @@ RSpec.describe "POST /api/v1/transfers", type: :request do
   let(:headers) do
     {
       "Authorization" => "Bearer #{JsonWebToken.encode(role: "operator")}",
-      "Content-Type"  => "application/json",
+      "Content-Type"  => "application/json"
     }
   end
 
@@ -118,7 +118,7 @@ RSpec.describe "POST /api/v1/transfers", type: :request do
     body = JSON.parse(response.body)
     expect(body.dig("error", "code")).to eq("insufficient_funds")
     expect(body.dig("error", "details", "current_amount")).to eq(100)
-    expect(body.dig("error", "details", "requested")).to    eq(500)
+    expect(body.dig("error", "details", "requested")).to eq(500)
   end
 
   context "with Idempotency-Key" do

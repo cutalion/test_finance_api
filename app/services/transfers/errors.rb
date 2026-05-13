@@ -5,7 +5,7 @@ module Transfers
         super
       end
 
-      def details = { "to_user_id" => ["must differ from from_user_id"] }
+      def details = { "to_user_id" => [ "must differ from from_user_id" ] }
     end
 
     class InvalidAmount < StandardError
@@ -13,7 +13,7 @@ module Transfers
         super
       end
 
-      def details = { "amount" => ["must be a positive integer"] }
+      def details = { "amount" => [ "must be a positive integer" ] }
     end
   end
 end

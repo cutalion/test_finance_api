@@ -22,7 +22,7 @@ RSpec.describe Transfers::Execute do
 
       txns = BalanceTransaction.where(transfer_id: transfer.id).order(:user_id)
       expect(txns.size).to eq(2)
-      expect(txns.map(&:amount).sort).to eq([-2_500, 2_500])
+      expect(txns.map(&:amount).sort).to eq([ -2_500, 2_500 ])
       expect(txns.find { |t| t.user_id == alice.id }.ending_amount).to eq(7_500)
       expect(txns.find { |t| t.user_id == bob.id   }.ending_amount).to eq(4_500)
     end
@@ -106,7 +106,7 @@ RSpec.describe Transfers::Execute do
           ActiveRecord::Base.connection_pool.with_connection {
             described_class.call(from_user_id: bob.id, to_user_id: alice.id, amount: 1_500)
           }
-        },
+        }
       ]
       threads.each(&:join)
 
