@@ -3,9 +3,6 @@ class ApplicationController < ActionController::API
 
   before_action :authenticate_operator!
 
-  rescue_from ActiveRecord::RecordInvalid, with: :render_validation_failed
-  rescue_from ActionController::ParameterMissing, with: :render_parameter_missing
-
   attr_reader :current_operator
 
   private
@@ -21,22 +18,18 @@ class ApplicationController < ActionController::API
     render_error(:unauthorized, "invalid_token", "Token is missing or invalid")
   end
 
-  def render_validation_failed(exception)
-    render_error(
-      :unprocessable_content,
-      "validation_failed",
-      "Validation failed",
-      exception.record.errors.messages.transform_keys(&:to_s),
-    )
-  end
-
-  def render_parameter_missing(exception)
-    render_error(
-      :unprocessable_content,
-      "validation_failed",
-      "Validation failed",
-      { exception.param.to_s => ["can't be blank"] },
-    )
+  def render_service_failure(result, status: :unprocessable_content)
+    base = result.errors.where(:base).first
+    if base
+      code    = base.type.to_s
+      message = base.message
+      details = base.options.except(:message).presence&.transform_keys(&:to_s)
+    else
+      code    = "validation_failed"
+      message = "Validation failed"
+      details = result.errors.messages.transform_keys(&:to_s)
+    end
+    render_error(status, code, message, details)
   end
 
   def render_error(status, code, message, details = nil)
