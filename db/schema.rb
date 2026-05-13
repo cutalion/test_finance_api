@@ -10,26 +10,10 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_13_150002) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_13_185122) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "citext"
   enable_extension "pg_catalog.plpgsql"
-
-  create_table "balance_transactions", force: :cascade do |t|
-    t.bigint "amount", null: false
-    t.datetime "created_at", null: false
-    t.bigint "ending_balance", null: false
-    t.bigint "transfer_id"
-    t.datetime "updated_at", null: false
-    t.bigint "user_id", null: false
-    t.index ["transfer_id"], name: "index_balance_transactions_on_transfer_id"
-    t.index ["user_id", "created_at"], name: "index_balance_transactions_on_user_id_and_created_at"
-    t.index ["user_id"], name: "index_balance_transactions_on_user_id"
-    t.check_constraint "amount <> 0", name: "btx_amount_nonzero"
-    t.check_constraint "amount >= '-1000000000000'::bigint AND amount <= '1000000000000'::bigint", name: "btx_amount_within_limit"
-    t.check_constraint "ending_balance <= '1000000000000'::bigint", name: "btx_ending_balance_within_limit"
-    t.check_constraint "ending_balance >= 0", name: "btx_ending_balance_nonneg"
-  end
 
   create_table "idempotency_keys", force: :cascade do |t|
     t.datetime "completed_at"
@@ -48,19 +32,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_13_150002) do
     t.check_constraint "response_body IS NULL OR char_length(response_body) <= 16384", name: "idempotency_keys_response_body_length"
   end
 
-  create_table "transfers", force: :cascade do |t|
-    t.bigint "amount", null: false
-    t.datetime "created_at", null: false
-    t.bigint "from_user_id", null: false
-    t.bigint "to_user_id", null: false
-    t.datetime "updated_at", null: false
-    t.index ["from_user_id"], name: "index_transfers_on_from_user_id"
-    t.index ["to_user_id"], name: "index_transfers_on_to_user_id"
-    t.check_constraint "amount <= '1000000000000'::bigint", name: "transfers_amount_within_limit"
-    t.check_constraint "amount > 0", name: "transfers_amount_positive"
-    t.check_constraint "from_user_id <> to_user_id", name: "transfers_distinct_users"
-  end
-
   create_table "users", force: :cascade do |t|
     t.bigint "balance", default: 0, null: false
     t.datetime "created_at", null: false
@@ -71,9 +42,4 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_13_150002) do
     t.check_constraint "balance >= 0", name: "users_balance_non_negative"
     t.check_constraint "char_length(email::text) <= 255", name: "users_email_length"
   end
-
-  add_foreign_key "balance_transactions", "transfers"
-  add_foreign_key "balance_transactions", "users"
-  add_foreign_key "transfers", "users", column: "from_user_id"
-  add_foreign_key "transfers", "users", column: "to_user_id"
 end
