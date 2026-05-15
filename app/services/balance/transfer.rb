@@ -2,6 +2,7 @@ module Balance
   class Transfer < ApplicationService
     attr_accessor :from, :recipient_email, :amount
 
+    validates :from, presence: true
     validate :amount_must_be_positive_integer
     validate :amount_must_be_within_limit
     validate :recipient_must_exist

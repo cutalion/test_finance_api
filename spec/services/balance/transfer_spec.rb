@@ -66,6 +66,14 @@ RSpec.describe Balance::Transfer do
       expect(result.errors[:recipient_email]).to be_present
     end
 
+    it "rejects a nil sender" do
+      result = call(from: nil)
+
+      expect(result).to be_failure
+      expect(result.errors[:from]).to be_present
+      expect(bob.reload.balance).to eq(2_000)
+    end
+
     it "fails with insufficient_funds and does not move money when sender is short" do
       alice.update!(balance: 100)
 
