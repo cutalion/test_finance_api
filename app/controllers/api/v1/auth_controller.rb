@@ -13,7 +13,7 @@ module Api
       private
 
       def render_failure(result)
-        status = result.errors.added?(:base, :invalid_credentials) ? :unauthorized : :unprocessable_content
+        status = result.failure.code == "invalid_credentials" ? :unauthorized : :unprocessable_content
         render_service_failure(result, status: status)
       end
     end

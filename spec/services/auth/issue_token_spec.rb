@@ -25,14 +25,15 @@ RSpec.describe Auth::IssueToken do
       result = described_class.call(email: "")
 
       expect(result).to be_failure
-      expect(result.errors[:email]).to be_present
+      expect(result.failure.code).to eq("validation_failed")
+      expect(result.failure.details[:email]).to be_present
     end
 
     it "fails with invalid_credentials for an unknown email" do
       result = described_class.call(email: "ghost@example.com")
 
       expect(result).to be_failure
-      expect(result.errors.where(:base).first.type).to eq(:invalid_credentials)
+      expect(result.failure.code).to eq("invalid_credentials")
     end
   end
 end

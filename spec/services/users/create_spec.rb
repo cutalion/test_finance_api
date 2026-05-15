@@ -20,7 +20,8 @@ RSpec.describe Users::Create do
         expect {
           result = described_class.call(email: email)
           expect(result).to be_failure
-          expect(result.errors[:email]).to be_present
+          expect(result.failure.code).to eq("validation_failed")
+          expect(result.failure.details[:email]).to be_present
         }.not_to change(User, :count)
       end
     end
@@ -38,7 +39,8 @@ RSpec.describe Users::Create do
       result = described_class.call(email: "#{long_local}@example.com")
 
       expect(result).to be_failure
-      expect(result.errors[:email]).to be_present
+      expect(result.failure.code).to eq("validation_failed")
+      expect(result.failure.details[:email]).to be_present
       expect(User.count).to eq(0)
     end
 
@@ -49,8 +51,7 @@ RSpec.describe Users::Create do
         result = described_class.call(email: "alice@example.com")
 
         expect(result).to be_failure
-        base = result.errors.where(:base).first
-        expect(base.type).to eq(:email_taken)
+        expect(result.failure.code).to eq("email_taken")
       }.not_to change(User, :count)
     end
 
@@ -61,7 +62,7 @@ RSpec.describe Users::Create do
         result = described_class.call(email: "ALICE@example.com")
 
         expect(result).to be_failure
-        expect(result.errors.where(:base).first.type).to eq(:email_taken)
+        expect(result.failure.code).to eq("email_taken")
       }.not_to change(User, :count)
     end
   end

@@ -25,17 +25,8 @@ class ApplicationController < ActionController::API
   end
 
   def render_service_failure(result, status: :unprocessable_content)
-    base = result.errors.where(:base).first
-    if base
-      code    = base.type.to_s
-      message = base.message
-      details = base.options.except(:message).presence&.transform_keys(&:to_s)
-    else
-      code    = "validation_failed"
-      message = "Validation failed"
-      details = result.errors.messages.transform_keys(&:to_s)
-    end
-    render_error(status, code, message, details)
+    f = result.failure
+    render_error(status, f.code, f.message, f.details)
   end
 
   def render_error(status, code, message, details = nil)

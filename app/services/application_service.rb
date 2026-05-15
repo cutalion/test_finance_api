@@ -1,10 +1,15 @@
 class ApplicationService
   include ActiveModel::Validations
 
-  Failure = Class.new(StandardError)
+  Failure = Data.define(:code, :message, :details)
 
-  Result = Data.define(:payload, :errors) do
-    def success? = errors.empty?
+  Halt = Class.new(StandardError) do
+    attr_reader :failure
+    def initialize(failure) = @failure = failure
+  end
+
+  Result = Data.define(:payload, :failure) do
+    def success? = failure.nil?
     def failure? = !success?
   end
 
@@ -13,22 +18,25 @@ class ApplicationService
   end
 
   def call
-    return Result.new(payload: nil, errors: errors) if invalid?
+    if invalid?
+      return Result.new(payload: nil, failure: Failure.new(
+        code: "validation_failed",
+        message: "Validation failed",
+        details: errors.messages.presence,
+      ))
+    end
 
     payload = perform
-    Result.new(payload: payload, errors: errors)
-  rescue Failure
-    Result.new(payload: nil, errors: errors)
+    Result.new(payload: payload, failure: nil)
+  rescue Halt => e
+    Result.new(payload: nil, failure: e.failure)
   end
 
-  def self.call(...)
-    new(...).call
-  end
+  def self.call(...) = new(...).call
 
   private
 
-  def fail!(code, **opts)
-    errors.add(:base, code, **opts)
-    raise Failure
+  def fail!(code, message:, **details)
+    raise Halt.new(Failure.new(code: code.to_s, message: message, details: details.presence))
   end
 end

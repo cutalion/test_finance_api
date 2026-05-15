@@ -29,7 +29,8 @@ RSpec.describe Balance::Transfer do
         result = call(amount: amount)
 
         expect(result).to be_failure
-        expect(result.errors[:amount]).to be_present
+        expect(result.failure.code).to eq("validation_failed")
+        expect(result.failure.details[:amount]).to be_present
         expect(alice.reload.balance).to eq(10_000)
         expect(bob.reload.balance).to   eq(2_000)
       end
@@ -43,7 +44,7 @@ RSpec.describe Balance::Transfer do
       result = call(recipient_email: alice.email)
 
       expect(result).to be_failure
-      expect(result.errors[:recipient_email].join).to match(/yourself/i)
+      expect(result.failure.details[:recipient_email].join).to match(/yourself/i)
       expect(alice.reload.balance).to eq(10_000)
       expect(bob.reload.balance).to eq(2_000)
     end
@@ -52,21 +53,21 @@ RSpec.describe Balance::Transfer do
       result = call(recipient_email: "ghost@example.com")
 
       expect(result).to be_failure
-      expect(result.errors[:recipient_email]).to be_present
+      expect(result.failure.details[:recipient_email]).to be_present
     end
 
     it "rejects a blank recipient_email with the same generic error" do
       result = call(recipient_email: nil)
 
       expect(result).to be_failure
-      expect(result.errors[:recipient_email]).to be_present
+      expect(result.failure.details[:recipient_email]).to be_present
     end
 
     it "rejects a nil sender" do
       result = call(from: nil)
 
       expect(result).to be_failure
-      expect(result.errors[:from]).to be_present
+      expect(result.failure.details[:from]).to be_present
       expect(bob.reload.balance).to eq(2_000)
     end
 
@@ -76,10 +77,9 @@ RSpec.describe Balance::Transfer do
       result = call(amount: 500)
 
       expect(result).to be_failure
-      base = result.errors.where(:base).first
-      expect(base.type).to eq(:insufficient_funds)
-      expect(base.options[:current_balance]).to eq(100)
-      expect(base.options[:requested]).to       eq(500)
+      expect(result.failure.code).to eq("insufficient_funds")
+      expect(result.failure.details[:current_balance]).to eq(100)
+      expect(result.failure.details[:requested]).to       eq(500)
 
       expect(alice.reload.balance).to eq(100)
       expect(bob.reload.balance).to   eq(2_000)
