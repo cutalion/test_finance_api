@@ -6,14 +6,21 @@ class ApplicationController < ActionController::API
   private
 
   def authenticate_user!
-    header = request.headers["Authorization"]
-    token = header&.delete_prefix("Bearer ")
-    raise JWT::DecodeError, "missing token" if token.blank?
+    token = request.headers["Authorization"]&.delete_prefix("Bearer ")
+    return render_invalid_token if token.blank?
 
-    payload = JsonWebToken.decode(token)
+    payload = begin
+      JsonWebToken.decode(token)
+    rescue JWT::DecodeError
+      nil
+    end
+    return render_invalid_token if payload.nil?
+
     @current_user = User.find_by(id: payload[:sub])
-    raise JWT::DecodeError, "user not found" unless @current_user
-  rescue JWT::DecodeError
+    render_invalid_token unless @current_user
+  end
+
+  def render_invalid_token
     render_error(:unauthorized, "invalid_token", "Token is missing or invalid")
   end
 
