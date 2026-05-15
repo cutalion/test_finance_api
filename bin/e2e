@@ -237,11 +237,11 @@ step "4. Top up / debit"
 
 http POST /api/v1/balance/adjustments "${ALICE_AUTH[@]}" -d '{"delta":5000}'
 assert_status 201 "$STATUS" "top up 5000"
-assert_eq "5000" "$(json_subget result balance "$BODY")" "  → result.balance is 5000"
+assert_eq "5000" "$(json_get balance "$BODY")" "  → balance is 5000"
 
 http POST /api/v1/balance/adjustments "${ALICE_AUTH[@]}" -d '{"delta":-2000}'
 assert_status 201 "$STATUS" "debit 2000"
-assert_eq "3000" "$(json_subget result balance "$BODY")" "  → result.balance is 3000"
+assert_eq "3000" "$(json_get balance "$BODY")" "  → balance is 3000"
 
 http POST /api/v1/balance/adjustments "${ALICE_AUTH[@]}" -d '{"delta":-999999}'
 assert_status 422 "$STATUS" "overdraft rejected"

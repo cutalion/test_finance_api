@@ -12,10 +12,10 @@ RSpec.describe "POST /api/v1/balance/adjustments", type: :request do
     expect(response).to have_http_status(:created)
     expect(json_body).to match(
       "delta" => 5000,
-      "result" => { "balance" => 5000 },
+      "balance" => 5000,
     )
     expect(json_body["delta"]).to be_a(Integer)
-    expect(json_body["result"]["balance"]).to be_a(Integer)
+    expect(json_body["balance"]).to be_a(Integer)
   end
 
   it "debits a balance and returns 201 with a negative amount" do
@@ -29,7 +29,7 @@ RSpec.describe "POST /api/v1/balance/adjustments", type: :request do
     expect(response).to have_http_status(:created)
     expect(json_body).to match(
       "delta" => -3000,
-      "result" => { "balance" => 7000 },
+      "balance" => 7000,
     )
   end
 

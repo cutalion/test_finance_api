@@ -13,7 +13,7 @@ module Balance
         ensure_balance_within_limit!(new_balance)
 
         user.update!(balance: new_balance)
-        { delta: delta, result: { balance: new_balance } }
+        { delta: delta, balance: new_balance }
       end
     end
 

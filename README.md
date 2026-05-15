@@ -143,7 +143,7 @@ curl -X POST http://localhost:3000/api/v1/balance/adjustments \
 ```json
 {
   "delta": 5000,
-  "result": { "balance": 17500 }
+  "balance": 17500
 }
 ```
 
