@@ -2,7 +2,7 @@
 
 Minimal Rails 8 API. See [`TASK.md`](TASK.md) for the spec.
 
-> **Branches:** [`main`](https://github.com/cutalion/test_finance_api/tree/main) (this branch) records every balance change in ledger tables (transactions + transfers); [`simplified`](https://github.com/cutalion/test_finance_api/tree/simplified) keeps only the current balance — no history. **API request paths and response shapes differ between the two branches**, so the examples below are specific to `main`.
+> **Branches:** [`main`](https://github.com/cutalion/test_finance_api/tree/main) (this branch) records every balance change in ledger tables (transactions + transfers); [`simplified`](https://github.com/cutalion/test_finance_api/tree/simplified) keeps only the current balance — no history; [`minimal`](https://github.com/cutalion/test_finance_api/tree/minimal) is the most stripped-down variant — no ledger, per-user JWT auth (each user authenticates as themselves, no operator token), no idempotency keys. **API request paths and response shapes differ between branches**, so the examples below are specific to `main`.
 
 ## Quick start
 
