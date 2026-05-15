@@ -1,6 +1,6 @@
 module ApiHelpers
-  def auth_headers(role: "operator")
-    { "Authorization" => "Bearer #{JsonWebToken.encode(role: role)}" }
+  def auth_headers(user)
+    { "Authorization" => "Bearer #{JsonWebToken.encode(sub: user.id, exp: 1.hour.from_now.to_i)}" }
   end
 
   def json_body

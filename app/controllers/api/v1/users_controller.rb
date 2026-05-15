@@ -1,6 +1,8 @@
 module Api
   module V1
     class UsersController < ApplicationController
+      skip_before_action :authenticate_user!, only: :create
+
       def create
         result = Users::Create.call(**user_params)
         return render_failure(result) if result.failure?

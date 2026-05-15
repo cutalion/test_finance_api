@@ -1,15 +1,18 @@
 class ApplicationController < ActionController::API
-  before_action :authenticate_operator!
+  before_action :authenticate_user!
+
+  attr_reader :current_user
 
   private
 
-  def authenticate_operator!
+  def authenticate_user!
     header = request.headers["Authorization"]
     token = header&.delete_prefix("Bearer ")
     raise JWT::DecodeError, "missing token" if token.blank?
 
     payload = JsonWebToken.decode(token)
-    raise JWT::DecodeError, "missing operator role" unless payload[:role] == "operator"
+    @current_user = User.find_by(id: payload[:sub])
+    raise JWT::DecodeError, "user not found" unless @current_user
   rescue JWT::DecodeError
     render_error(:unauthorized, "invalid_token", "Token is missing or invalid")
   end
