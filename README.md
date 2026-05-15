@@ -26,8 +26,12 @@ docker compose run --rm web bin/rails db:prepare
 # 3. Run the test suite
 docker compose run --rm web bundle exec rspec
 
-# 4. Mint an operator JWT and export it (set JWT_SECRET in your environment or `.env` first)
-export TOKEN=$(docker compose run --rm -T web bin/rails operator:token | tr -d '\r' | tail -n 1)
+# 4. Create Alice and authenticate (set JWT_SECRET in your environment or `.env` first)
+curl -X POST http://localhost:3000/api/v1/users \
+  -H 'Content-Type: application/json' -d '{"email":"alice@example.com"}'
+curl -X POST http://localhost:3000/api/v1/users/auth \
+  -H 'Content-Type: application/json' -d '{"email":"alice@example.com"}'
+export ALICE_TOKEN=<access_token from the response above>
 
 # 5. Start the server (http://localhost:3000)
 docker compose up -d
@@ -36,36 +40,45 @@ docker compose up -d
 ### Short curl walkthrough
 
 ```bash
-# Create Alice (id: 1)
+# 1. Create Alice (public, no auth)
 curl -X POST http://localhost:3000/api/v1/users \
-  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -H 'Content-Type: application/json' \
   -d '{"email":"alice@example.com"}'
 
-# Create Bob (id: 2)
-curl -X POST http://localhost:3000/api/v1/users \
-  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"email":"bob@example.com"}'
+# 2. Authenticate as Alice → access_token
+curl -X POST http://localhost:3000/api/v1/users/auth \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"alice@example.com"}'
 
-# Top up Alice with 10000 (minor units)
-curl -X POST http://localhost:3000/api/v1/users/1/balance/adjustments \
-  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+# Export the token from the previous response:
+export ALICE_TOKEN=...
+
+# 3. Check Alice's balance
+curl http://localhost:3000/api/v1/balance \
+  -H "Authorization: Bearer $ALICE_TOKEN"
+
+# 4. Top up Alice with 10000 (minor units)
+curl -X POST http://localhost:3000/api/v1/balance/adjustments \
+  -H "Authorization: Bearer $ALICE_TOKEN" -H 'Content-Type: application/json' \
   -d '{"by_amount":10000}'
 
-# Transfer 3000 from Alice → Bob
+# 5. Transfer 3000 Alice → Bob (Bob's id comes from the JWT's `sub` claim
+#    issued when Bob authenticates — there is no /users/:id endpoint)
 curl -X POST http://localhost:3000/api/v1/transfers \
-  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"from_user_id":1,"to_user_id":2,"amount":3000}'
+  -H "Authorization: Bearer $ALICE_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"to_user_id":2,"amount":3000}'
 ```
 
 ## Detailed API examples
 
-All examples assume the server is running and `$TOKEN` is exported.
+All examples assume the server is running. Authenticated endpoints require `$ALICE_TOKEN` (an access token obtained from `POST /api/v1/users/auth`).
 
 ### 1. Create user
 
+Signup is public — no token required.
+
 ```bash
 curl -X POST http://localhost:3000/api/v1/users \
-  -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"email":"alice@example.com"}'
 ```
@@ -82,11 +95,33 @@ curl -X POST http://localhost:3000/api/v1/users \
 { "error": { "code": "email_taken", "message": "Email is already registered" } }
 ```
 
-### 2. Get balance
+### 2. Authenticate
 
 ```bash
-curl http://localhost:3000/api/v1/users/1/balance \
-  -H "Authorization: Bearer $TOKEN"
+curl -X POST http://localhost:3000/api/v1/users/auth \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"alice@example.com"}'
+```
+
+`200 OK`
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiJ9..."
+}
+```
+
+The token's `sub` claim carries the user's id — this is the only way the API exposes it (needed as `to_user_id` when someone transfers money to this user).
+
+`404 Not Found` — unknown email
+```json
+{ "error": { "code": "user_not_found", "message": "User not found" } }
+```
+
+### 3. Get balance
+
+```bash
+curl http://localhost:3000/api/v1/balance \
+  -H "Authorization: Bearer $ALICE_TOKEN"
 ```
 
 `200 OK`
@@ -96,13 +131,13 @@ curl http://localhost:3000/api/v1/users/1/balance \
 }
 ```
 
-### 3. Top up / debit
+### 4. Top up / debit
 
 Top up (positive amount):
 
 ```bash
-curl -X POST http://localhost:3000/api/v1/users/1/balance/adjustments \
-  -H "Authorization: Bearer $TOKEN" \
+curl -X POST http://localhost:3000/api/v1/balance/adjustments \
+  -H "Authorization: Bearer $ALICE_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"by_amount":5000}'
 ```
@@ -118,8 +153,8 @@ curl -X POST http://localhost:3000/api/v1/users/1/balance/adjustments \
 Debit (negative amount):
 
 ```bash
-curl -X POST http://localhost:3000/api/v1/users/1/balance/adjustments \
-  -H "Authorization: Bearer $TOKEN" \
+curl -X POST http://localhost:3000/api/v1/balance/adjustments \
+  -H "Authorization: Bearer $ALICE_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"by_amount":-3000}'
 ```
@@ -135,13 +170,13 @@ curl -X POST http://localhost:3000/api/v1/users/1/balance/adjustments \
 }
 ```
 
-### 4. Transfer between users
+### 5. Transfer between users
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/transfers \
-  -H "Authorization: Bearer $TOKEN" \
+  -H "Authorization: Bearer $ALICE_TOKEN" \
   -H 'Content-Type: application/json' \
-  -d '{"from_user_id":1,"to_user_id":2,"amount":2500}'
+  -d '{"to_user_id":2,"amount":2500}'
 ```
 
 `201 Created`

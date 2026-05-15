@@ -132,6 +132,17 @@ assert_eq() {
   fi
 }
 
+# helper: decode the `sub` claim from a JWT payload
+jwt_sub() {
+  local token="$1"
+  local payload="${token#*.}"; payload="${payload%.*}"
+  # add padding then base64-url decode
+  local pad=$(( (4 - ${#payload} % 4) % 4 ))
+  printf '%s' "$payload" | tr '_-' '/+' | { cat; printf '='%.0s $(seq 1 $pad); } \
+    | base64 -d 2>/dev/null \
+    | grep -oE '"sub":[[:space:]]*[0-9]+' | grep -oE '[0-9]+'
+}
+
 # --- bring up the stack -------------------------------------------------------
 cd "$(dirname "$0")/.."
 
@@ -159,14 +170,6 @@ docker compose run --rm -T web bundle install >/dev/null
 step "Resetting database (db:drop db:prepare for a clean slate)"
 docker compose run --rm -T web bin/rails db:drop db:prepare >/dev/null
 
-step "Minting operator JWT"
-TOKEN=$(docker compose run --rm -T web bin/rails operator:token 2>/dev/null | tr -d '\r' | tail -n 1)
-if [[ -z "$TOKEN" ]]; then
-  printf '%s\n' "$(c_red 'Failed to mint operator token')" >&2
-  exit 1
-fi
-printf '  token: %s...\n' "${TOKEN:0:32}"
-
 step "Starting web server"
 docker compose up -d web >/dev/null
 
@@ -185,80 +188,86 @@ if [[ $ready -ne 1 ]]; then
   exit 1
 fi
 
-AUTH=(-H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json")
+# --- 1. Create users ----------------------------------------------------------
+step "1. Create users"
 
-# --- 1. Create user -----------------------------------------------------------
-step "1. Create user"
-
-http POST /api/v1/users "${AUTH[@]}" -d '{"email":"alice@example.com"}'
+http POST /api/v1/users -H "Content-Type: application/json" -d '{"email":"alice@example.com"}'
 assert_status 201 "$STATUS" "create alice"
-ALICE_ID=$(json_get id "$BODY")
 assert_eq "alice@example.com" "$(json_get email "$BODY")" "alice email echoed back"
 
-http POST /api/v1/users "${AUTH[@]}" -d '{"email":"bob@example.com"}'
+http POST /api/v1/users -H "Content-Type: application/json" -d '{"email":"bob@example.com"}'
 assert_status 201 "$STATUS" "create bob"
-BOB_ID=$(json_get id "$BODY")
 
-http POST /api/v1/users "${AUTH[@]}" -d '{"email":"alice@example.com"}'
+http POST /api/v1/users -H "Content-Type: application/json" -d '{"email":"alice@example.com"}'
 assert_status 409 "$STATUS" "duplicate email rejected"
 assert_eq "email_taken" "$(json_get error.code "$BODY")" "  → error.code is email_taken"
 
-http POST /api/v1/users "${AUTH[@]}" -d '{"email":"not-an-email"}'
+http POST /api/v1/users -H "Content-Type: application/json" -d '{"email":"not-an-email"}'
 assert_status 422 "$STATUS" "invalid email rejected"
 
-http POST /api/v1/users -H "Content-Type: application/json" -d '{"email":"x@y.z"}'
-assert_status 401 "$STATUS" "unauthenticated rejected"
+# --- 2. Auth — mint per-user tokens -------------------------------------------
+step "2. Auth — mint per-user tokens"
 
-# --- 2. Get balance -----------------------------------------------------------
-step "2. Get balance"
+http POST /api/v1/users/auth -H "Content-Type: application/json" -d '{"email":"alice@example.com"}'
+assert_status 200 "$STATUS" "auth alice"
+ALICE_TOKEN=$(json_get access_token "$BODY")
+ALICE_ID=$(jwt_sub "$ALICE_TOKEN")
 
-http GET "/api/v1/users/$ALICE_ID/balance" "${AUTH[@]}"
+http POST /api/v1/users/auth -H "Content-Type: application/json" -d '{"email":"bob@example.com"}'
+assert_status 200 "$STATUS" "auth bob"
+BOB_TOKEN=$(json_get access_token "$BODY")
+BOB_ID=$(jwt_sub "$BOB_TOKEN")
+
+http POST /api/v1/users/auth -H "Content-Type: application/json" -d '{"email":"ghost@example.com"}'
+assert_status 404 "$STATUS" "auth unknown email → 404"
+
+ALICE_AUTH=(-H "Authorization: Bearer $ALICE_TOKEN" -H "Content-Type: application/json")
+BOB_AUTH=(  -H "Authorization: Bearer $BOB_TOKEN"   -H "Content-Type: application/json")
+
+# --- 3. Get balance -----------------------------------------------------------
+step "3. Get balance"
+
+http GET /api/v1/balance "${ALICE_AUTH[@]}"
 assert_status 200 "$STATUS" "fetch alice balance"
 assert_eq "0" "$(json_get balance "$BODY")" "  → balance is 0"
 
-http GET "/api/v1/users/999999/balance" "${AUTH[@]}"
-assert_status 404 "$STATUS" "missing user → 404"
+http GET /api/v1/balance
+assert_status 401 "$STATUS" "unauthenticated balance → 401"
 
-# --- 3. Top up / debit --------------------------------------------------------
-step "3. Top up / debit"
+# --- 4. Top up / debit --------------------------------------------------------
+step "4. Top up / debit"
 
-http POST "/api/v1/users/$ALICE_ID/balance/adjustments" \
-  "${AUTH[@]}" -d '{"amount":5000}'
+http POST /api/v1/balance/adjustments "${ALICE_AUTH[@]}" -d '{"by_amount":5000}'
 assert_status 201 "$STATUS" "top up 5000"
 assert_eq "5000" "$(json_subget result balance "$BODY")" "  → result.balance is 5000"
 
-http POST "/api/v1/users/$ALICE_ID/balance/adjustments" \
-  "${AUTH[@]}" -d '{"amount":-2000}'
+http POST /api/v1/balance/adjustments "${ALICE_AUTH[@]}" -d '{"by_amount":-2000}'
 assert_status 201 "$STATUS" "debit 2000"
 assert_eq "3000" "$(json_subget result balance "$BODY")" "  → result.balance is 3000"
 
-http POST "/api/v1/users/$ALICE_ID/balance/adjustments" \
-  "${AUTH[@]}" -d '{"amount":-999999}'
+http POST /api/v1/balance/adjustments "${ALICE_AUTH[@]}" -d '{"by_amount":-999999}'
 assert_status 422 "$STATUS" "overdraft rejected"
 assert_eq "insufficient_funds" "$(json_get error.code "$BODY")" "  → error.code is insufficient_funds"
 
-# --- 4. Transfer --------------------------------------------------------------
-step "4. Transfer between users"
+# --- 5. Transfer --------------------------------------------------------------
+step "5. Transfer between users"
 
-http POST /api/v1/transfers \
-  "${AUTH[@]}" -d "{\"from_user_id\":$ALICE_ID,\"to_user_id\":$BOB_ID,\"amount\":1000}"
+http POST /api/v1/transfers "${ALICE_AUTH[@]}" -d "{\"to_user_id\":$BOB_ID,\"amount\":1000}"
 assert_status 201 "$STATUS" "transfer 1000 alice → bob"
 assert_eq "2000" "$(json_subget from balance "$BODY")" "  → from.balance is 2000"
 assert_eq "1000" "$(json_subget to   balance "$BODY")" "  → to.balance is 1000"
 
-http GET "/api/v1/users/$ALICE_ID/balance" "${AUTH[@]}"
+http GET /api/v1/balance "${ALICE_AUTH[@]}"
 assert_eq "2000" "$(json_get balance "$BODY")" "alice balance now 2000"
 
-http GET "/api/v1/users/$BOB_ID/balance" "${AUTH[@]}"
+http GET /api/v1/balance "${BOB_AUTH[@]}"
 assert_eq "1000" "$(json_get balance "$BODY")" "bob balance now 1000"
 
-http POST /api/v1/transfers \
-  "${AUTH[@]}" -d "{\"from_user_id\":$ALICE_ID,\"to_user_id\":$BOB_ID,\"amount\":999999}"
+http POST /api/v1/transfers "${ALICE_AUTH[@]}" -d "{\"to_user_id\":$BOB_ID,\"amount\":999999}"
 assert_status 422 "$STATUS" "transfer beyond balance rejected"
 assert_eq "insufficient_funds" "$(json_get error.code "$BODY")" "  → error.code is insufficient_funds"
 
-http POST /api/v1/transfers \
-  "${AUTH[@]}" -d "{\"from_user_id\":$ALICE_ID,\"to_user_id\":999999,\"amount\":1}"
+http POST /api/v1/transfers "${ALICE_AUTH[@]}" -d '{"to_user_id":999999,"amount":1}'
 assert_status 422 "$STATUS" "transfer to missing user rejected"
 assert_eq "user_not_found" "$(json_get error.code "$BODY")" "  → error.code is user_not_found"
 
