@@ -22,10 +22,10 @@ RSpec.describe "POST /api/v1/auth", type: :request do
     expect(response).to have_http_status(:ok)
   end
 
-  it "returns 404 user_not_found for an unknown email" do
+  it "returns 401 invalid_credentials for an unknown email" do
     post "/api/v1/auth", params: { email: "ghost@example.com" }, as: :json
 
-    expect(response).to have_error_code(:user_not_found).with_status(:not_found)
+    expect(response).to have_error_code(:invalid_credentials).with_status(:unauthorized)
   end
 
   it "returns 422 validation_failed when email is missing" do

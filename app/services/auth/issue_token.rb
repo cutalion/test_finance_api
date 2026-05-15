@@ -1,5 +1,5 @@
 module Auth
-  class Login < ApplicationService
+  class IssueToken < ApplicationService
     attr_accessor :email
 
     validates :email, presence: true
@@ -8,7 +8,7 @@ module Auth
 
     def perform
       user = User.find_by("LOWER(email) = ?", email.to_s.downcase)
-      fail!(:user_not_found) unless user
+      fail!(:invalid_credentials, message: "Invalid credentials") unless user
 
       JsonWebToken.encode(sub: user.id, exp: 24.hours.from_now.to_i)
     end
