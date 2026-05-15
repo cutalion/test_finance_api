@@ -62,11 +62,10 @@ curl -X POST http://localhost:3000/api/v1/balance/adjustments \
   -H "Authorization: Bearer $ALICE_TOKEN" -H 'Content-Type: application/json' \
   -d '{"by_amount":10000}'
 
-# 5. Transfer 3000 Alice → Bob (Bob's id comes from the JWT's `sub` claim
-#    issued when Bob authenticates — there is no /users/:id endpoint)
+# 5. Transfer 3000 Alice → Bob (recipient identified by email)
 curl -X POST http://localhost:3000/api/v1/transfers \
   -H "Authorization: Bearer $ALICE_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"to_user_id":2,"amount":3000}'
+  -d '{"recipient_email":"bob@example.com","amount":3000}'
 ```
 
 ## Detailed API examples
@@ -110,7 +109,7 @@ curl -X POST http://localhost:3000/api/v1/users/auth \
 }
 ```
 
-The token's `sub` claim carries the user's id — this is the only way the API exposes it (needed as `to_user_id` when someone transfers money to this user).
+The token's `sub` claim carries the user's id (used internally only). Transfers identify the recipient by email, so an id is never needed at the API surface.
 
 `404 Not Found` — unknown email
 ```json
@@ -176,15 +175,15 @@ curl -X POST http://localhost:3000/api/v1/balance/adjustments \
 curl -X POST http://localhost:3000/api/v1/transfers \
   -H "Authorization: Bearer $ALICE_TOKEN" \
   -H 'Content-Type: application/json' \
-  -d '{"to_user_id":2,"amount":2500}'
+  -d '{"recipient_email":"bob@example.com","amount":2500}'
 ```
 
 `201 Created`
 ```json
 {
   "amount": 2500,
-  "from": { "balance": 15000 },
-  "to":   { "balance": 8000 }
+  "from": { "email": "alice@example.com", "balance": 15000 },
+  "to":   { "email": "bob@example.com",   "balance": 8000 }
 }
 ```
 

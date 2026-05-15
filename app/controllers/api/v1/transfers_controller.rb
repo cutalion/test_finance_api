@@ -3,9 +3,9 @@ module Api
     class TransfersController < ApplicationController
       def create
         result = ::Balance::Transfer.call(
-          from:   current_user,
-          to:     User.find_by(id: params[:to_user_id]),
-          amount: params[:amount],
+          from:            current_user,
+          recipient_email: params[:recipient_email],
+          amount:          params[:amount],
         )
         return render_service_failure(result) if result.failure?
 

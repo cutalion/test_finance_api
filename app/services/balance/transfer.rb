@@ -1,12 +1,11 @@
 module Balance
   class Transfer < ApplicationService
-    attr_accessor :from, :to, :amount
+    attr_accessor :from, :recipient_email, :amount
 
     validate :amount_must_be_positive_integer
     validate :amount_must_be_within_limit
-    validate :users_must_differ
-    validate :from_must_exist
-    validate :to_must_exist
+    validate :recipient_must_exist
+    validate :recipient_must_differ_from_sender
 
     def perform
       ActiveRecord::Base.transaction do
@@ -21,6 +20,10 @@ module Balance
     end
 
     private
+
+    def to
+      @to ||= User.find_by(email: recipient_email) if recipient_email.present?
+    end
 
     def ensure_sufficient_funds!
       return if from.balance >= amount
@@ -45,8 +48,8 @@ module Balance
 
       {
         amount: amount,
-        from:   { balance: new_from },
-        to:     { balance: new_to }
+        from:   { email: from.email, balance: new_from },
+        to:     { email: to.email,   balance: new_to }
       }
     end
 
@@ -61,17 +64,13 @@ module Balance
       errors.add(:amount, "must not exceed #{User::MAX_BALANCE}")
     end
 
-    def users_must_differ
-      return unless from && to
-      errors.add(:to_user_id, "must differ from from_user_id") if from.id == to.id
+    def recipient_must_exist
+      errors.add(:recipient_email, "is invalid") if to.blank?
     end
 
-    def from_must_exist
-      errors.add(:base, :user_not_found, message: "User not found") unless from.present?
-    end
-
-    def to_must_exist
-      errors.add(:base, :user_not_found, message: "User not found") unless to.present?
+    def recipient_must_differ_from_sender
+      return if to.blank? || from.blank?
+      errors.add(:recipient_email, "cannot transfer to yourself") if to.id == from.id
     end
   end
 end

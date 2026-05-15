@@ -6,9 +6,9 @@ RSpec.describe Balance::Transfer do
 
   def call(**overrides)
     described_class.call(
-      from:   alice,
-      to:     bob,
-      amount: 2_500,
+      from:            alice,
+      recipient_email: bob.email,
+      amount:          2_500,
       **overrides,
     )
   end
@@ -20,8 +20,8 @@ RSpec.describe Balance::Transfer do
       expect(result).to be_success
       expect(result.payload).to eq(
         amount: 2_500,
-        from:   { balance: 7_500 },
-        to:     { balance: 4_500 },
+        from:   { email: alice.email, balance: 7_500 },
+        to:     { email: bob.email,   balance: 4_500 },
       )
 
       expect(alice.reload.balance).to eq(7_500)
@@ -43,13 +43,27 @@ RSpec.describe Balance::Transfer do
     include_examples "validation error on :amount", -100
     include_examples "validation error on :amount", "2500"
 
-    it "rejects same-user transfers" do
-      result = call(to: alice)
+    it "rejects same-user transfers with a distinct self-transfer error" do
+      result = call(recipient_email: alice.email)
 
       expect(result).to be_failure
-      expect(result.errors[:to_user_id]).to be_present
+      expect(result.errors[:recipient_email].join).to match(/yourself/i)
       expect(alice.reload.balance).to eq(10_000)
       expect(bob.reload.balance).to eq(2_000)
+    end
+
+    it "rejects an unknown recipient email with the same generic error" do
+      result = call(recipient_email: "ghost@example.com")
+
+      expect(result).to be_failure
+      expect(result.errors[:recipient_email]).to be_present
+    end
+
+    it "rejects a blank recipient_email with the same generic error" do
+      result = call(recipient_email: nil)
+
+      expect(result).to be_failure
+      expect(result.errors[:recipient_email]).to be_present
     end
 
     it "fails with insufficient_funds and does not move money when sender is short" do
@@ -80,12 +94,12 @@ RSpec.describe Balance::Transfer do
       threads = [
         Thread.new {
           ActiveRecord::Base.connection_pool.with_connection {
-            described_class.call(from: alice, to: bob, amount: 1_000)
+            described_class.call(from: alice, recipient_email: bob.email, amount: 1_000)
           }
         },
         Thread.new {
           ActiveRecord::Base.connection_pool.with_connection {
-            described_class.call(from: bob, to: alice, amount: 1_500)
+            described_class.call(from: bob, recipient_email: alice.email, amount: 1_500)
           }
         }
       ]
