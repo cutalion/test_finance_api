@@ -109,9 +109,9 @@ curl -X POST http://localhost:3000/api/v1/auth \
 
 The token's `sub` claim carries the user's id (used internally only). Transfers identify the recipient by email, so an id is never needed at the API surface.
 
-`404 Not Found` — unknown email
+`401 Unauthorized` — unknown email (treated as bad credentials so the endpoint can't be used to probe registration)
 ```json
-{ "error": { "code": "user_not_found", "message": "User not found" } }
+{ "error": { "code": "invalid_credentials", "message": "Invalid credentials" } }
 ```
 
 ### 3. Get balance
@@ -180,17 +180,18 @@ curl -X POST http://localhost:3000/api/v1/transfers \
 ```json
 {
   "amount": 2500,
-  "from": { "email": "alice@example.com", "balance": 15000 },
-  "to":   { "email": "bob@example.com",   "balance": 8000 }
+  "balance": 15000
 }
 ```
+
+`balance` is the sender's new balance. The recipient's balance is intentionally not disclosed.
 
 `422 Unprocessable Entity` — sender lacks funds
 ```json
 {
   "error": {
     "code": "insufficient_funds",
-    "message": "Sender balance would go negative",
+    "message": "Balance would go negative",
     "details": { "current_balance": 1000, "requested": 2500 }
   }
 }
