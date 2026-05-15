@@ -211,15 +211,13 @@ step "2. Auth — mint per-user tokens"
 http POST /api/v1/auth -H "Content-Type: application/json" -d '{"email":"alice@example.com"}'
 assert_status 200 "$STATUS" "auth alice"
 ALICE_TOKEN=$(json_get access_token "$BODY")
-ALICE_ID=$(jwt_sub "$ALICE_TOKEN")
 
 http POST /api/v1/auth -H "Content-Type: application/json" -d '{"email":"bob@example.com"}'
 assert_status 200 "$STATUS" "auth bob"
 BOB_TOKEN=$(json_get access_token "$BODY")
-BOB_ID=$(jwt_sub "$BOB_TOKEN")
 
 http POST /api/v1/auth -H "Content-Type: application/json" -d '{"email":"ghost@example.com"}'
-assert_status 404 "$STATUS" "auth unknown email → 404"
+assert_status 401 "$STATUS" "auth unknown email → 401"
 
 ALICE_AUTH=(-H "Authorization: Bearer $ALICE_TOKEN" -H "Content-Type: application/json")
 BOB_AUTH=(  -H "Authorization: Bearer $BOB_TOKEN"   -H "Content-Type: application/json")
@@ -252,7 +250,7 @@ assert_eq "insufficient_funds" "$(json_get error.code "$BODY")" "  → error.cod
 # --- 5. Transfer --------------------------------------------------------------
 step "5. Transfer between users"
 
-http POST /api/v1/transfers "${ALICE_AUTH[@]}" -d "{\"to_user_id\":$BOB_ID,\"amount\":1000}"
+http POST /api/v1/transfers "${ALICE_AUTH[@]}" -d '{"recipient_email":"bob@example.com","amount":1000}'
 assert_status 201 "$STATUS" "transfer 1000 alice → bob"
 assert_eq "2000" "$(json_subget from balance "$BODY")" "  → from.balance is 2000"
 assert_eq "1000" "$(json_subget to   balance "$BODY")" "  → to.balance is 1000"
@@ -263,13 +261,13 @@ assert_eq "2000" "$(json_get balance "$BODY")" "alice balance now 2000"
 http GET /api/v1/balance "${BOB_AUTH[@]}"
 assert_eq "1000" "$(json_get balance "$BODY")" "bob balance now 1000"
 
-http POST /api/v1/transfers "${ALICE_AUTH[@]}" -d "{\"to_user_id\":$BOB_ID,\"amount\":999999}"
+http POST /api/v1/transfers "${ALICE_AUTH[@]}" -d '{"recipient_email":"bob@example.com","amount":999999}'
 assert_status 422 "$STATUS" "transfer beyond balance rejected"
 assert_eq "insufficient_funds" "$(json_get error.code "$BODY")" "  → error.code is insufficient_funds"
 
-http POST /api/v1/transfers "${ALICE_AUTH[@]}" -d '{"to_user_id":999999,"amount":1}'
+http POST /api/v1/transfers "${ALICE_AUTH[@]}" -d '{"recipient_email":"ghost@example.com","amount":1}'
 assert_status 422 "$STATUS" "transfer to missing user rejected"
-assert_eq "user_not_found" "$(json_get error.code "$BODY")" "  → error.code is user_not_found"
+assert_eq "validation_failed" "$(json_get error.code "$BODY")" "  → error.code is validation_failed"
 
 # --- summary ------------------------------------------------------------------
 TOTAL=$((PASS + FAIL))
