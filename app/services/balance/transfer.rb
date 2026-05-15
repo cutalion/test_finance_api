@@ -30,10 +30,10 @@ module Balance
     end
 
     def ensure_recipient_balance_within_limit!
-      return if to.balance + amount <= Money::MAX_AMOUNT
+      return if to.balance + amount <= User::MAX_BALANCE
 
       fail!(:balance_limit_exceeded, message: "Recipient balance would exceed the maximum",
-            current_balance: to.balance, requested: amount, limit: Money::MAX_AMOUNT)
+            current_balance: to.balance, requested: amount, limit: User::MAX_BALANCE)
     end
 
     def transfer!
@@ -57,8 +57,8 @@ module Balance
 
     def amount_must_be_within_limit
       return unless amount.is_a?(Integer) && amount.positive?
-      return if amount <= Money::MAX_AMOUNT
-      errors.add(:amount, "must not exceed #{Money::MAX_AMOUNT}")
+      return if amount <= User::MAX_BALANCE
+      errors.add(:amount, "must not exceed #{User::MAX_BALANCE}")
     end
 
     def users_must_differ

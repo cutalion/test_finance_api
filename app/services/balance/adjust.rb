@@ -28,8 +28,8 @@ module Balance
 
     def by_must_be_within_limit
       return unless by.is_a?(Integer)
-      return if by.abs <= Money::MAX_AMOUNT
-      errors.add(:amount, "must not exceed #{Money::MAX_AMOUNT} in magnitude")
+      return if by.abs <= User::MAX_BALANCE
+      errors.add(:amount, "must not exceed #{User::MAX_BALANCE} in magnitude")
     end
 
     def ensure_sufficient_funds!(new_balance)
@@ -39,9 +39,9 @@ module Balance
     end
 
     def ensure_balance_within_limit!(new_balance)
-      return if new_balance <= Money::MAX_AMOUNT
+      return if new_balance <= User::MAX_BALANCE
       fail!(:balance_limit_exceeded, message: "Resulting balance would exceed the maximum",
-            current_balance: user.balance, requested: by, limit: Money::MAX_AMOUNT)
+            current_balance: user.balance, requested: by, limit: User::MAX_BALANCE)
     end
   end
 end

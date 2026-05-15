@@ -68,10 +68,10 @@ RSpec.describe "POST /api/v1/users/:id/balance/adjustments", type: :request do
     expect(response).to have_error_code(:validation_failed).with_status(:unprocessable_content)
   end
 
-  it "returns 422 validation_failed when amount exceeds Money::MAX_AMOUNT" do
+  it "returns 422 validation_failed when amount exceeds the configured maximum" do
     expect {
       post "/api/v1/users/#{user.id}/balance/adjustments",
-        params: { amount: Money::MAX_AMOUNT + 1 }, headers: auth_headers, as: :json
+        params: { amount: User::MAX_BALANCE + 1 }, headers: auth_headers, as: :json
     }.not_to change { user.reload.balance }
 
     expect(response).to have_error_code(:validation_failed).with_status(:unprocessable_content)
@@ -79,7 +79,7 @@ RSpec.describe "POST /api/v1/users/:id/balance/adjustments", type: :request do
   end
 
   it "returns 422 balance_limit_exceeded when credit would push balance over the limit" do
-    user.update!(balance: Money::MAX_AMOUNT - 1)
+    user.update!(balance: User::MAX_BALANCE - 1)
 
     expect {
       post "/api/v1/users/#{user.id}/balance/adjustments",
@@ -88,7 +88,7 @@ RSpec.describe "POST /api/v1/users/:id/balance/adjustments", type: :request do
 
     expect(response).to have_error_code(:balance_limit_exceeded)
       .with_status(:unprocessable_content)
-      .with_details(current_balance: Money::MAX_AMOUNT - 1, requested: 100, limit: Money::MAX_AMOUNT)
+      .with_details(current_balance: User::MAX_BALANCE - 1, requested: 100, limit: User::MAX_BALANCE)
   end
 
   it "returns 422 insufficient_funds when debit would push balance negative" do
