@@ -4,7 +4,7 @@ module Api
       skip_before_action :authenticate_user!, only: :create
 
       def create
-        result = Users::Create.call(**user_params)
+        result = Users::Create.call(email: params[:email])
         return render_failure(result) if result.failure?
 
         user = result.payload
@@ -16,10 +16,6 @@ module Api
       def render_failure(result)
         status = result.errors.added?(:base, :email_taken) ? :conflict : :unprocessable_content
         render_service_failure(result, status: status)
-      end
-
-      def user_params
-        params.permit(:email).to_h.symbolize_keys
       end
     end
   end
