@@ -3,7 +3,7 @@ module Api
     class TransfersController < ApplicationController
       def create
         result = ::Balance::Transfer.call(
-          from:   User.find_by(id: params[:from_user_id]),
+          from:   current_user,
           to:     User.find_by(id: params[:to_user_id]),
           amount: params[:amount],
         )
