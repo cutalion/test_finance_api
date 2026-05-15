@@ -45,8 +45,8 @@ module Balance
 
       {
         amount: amount,
-        from:   { user_id: from.id, balance: new_from },
-        to:     { user_id: to.id,   balance: new_to }
+        from:   { balance: new_from },
+        to:     { balance: new_to }
       }
     end
 

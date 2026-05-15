@@ -6,7 +6,7 @@ module Api
         return render_failure(result) if result.failure?
 
         user = result.payload
-        render json: { id: user.id, email: user.email }, status: :created
+        render json: { email: user.email }, status: :created
       end
 
       private

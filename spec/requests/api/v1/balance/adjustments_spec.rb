@@ -12,7 +12,7 @@ RSpec.describe "POST /api/v1/users/:id/balance/adjustments", type: :request do
     expect(response).to have_http_status(:created)
     expect(json_body).to match(
       "amount" => 5000,
-      "result" => { "user_id" => user.id, "balance" => 5000 },
+      "result" => { "balance" => 5000 },
     )
     expect(json_body["amount"]).to be_a(Integer)
     expect(json_body["result"]["balance"]).to be_a(Integer)
@@ -29,7 +29,7 @@ RSpec.describe "POST /api/v1/users/:id/balance/adjustments", type: :request do
     expect(response).to have_http_status(:created)
     expect(json_body).to match(
       "amount" => -3000,
-      "result" => { "user_id" => user.id, "balance" => 7000 },
+      "result" => { "balance" => 7000 },
     )
   end
 

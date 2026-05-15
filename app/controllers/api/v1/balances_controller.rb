@@ -4,7 +4,7 @@ module Api
       before_action :load_user
 
       def show
-        render json: { user_id: @user.id, balance: @user.balance }
+        render json: { balance: @user.balance }
       end
 
       private

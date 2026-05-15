@@ -15,8 +15,8 @@ RSpec.describe "POST /api/v1/transfers", type: :request do
     expect(response).to have_http_status(:created)
     expect(json_body).to match(
       "amount" => 2_500,
-      "from"   => { "user_id" => alice.id, "balance" => 15_000 },
-      "to"     => { "user_id" => bob.id,   "balance" => 8_000 },
+      "from"   => { "balance" => 15_000 },
+      "to"     => { "balance" => 8_000 },
     )
   end
 

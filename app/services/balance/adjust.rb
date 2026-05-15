@@ -13,7 +13,7 @@ module Balance
         ensure_balance_within_limit!(new_balance)
 
         user.update!(balance: new_balance)
-        { amount: by, result: { user_id: user.id, balance: new_balance } }
+        { amount: by, result: { balance: new_balance } }
       end
     end
 

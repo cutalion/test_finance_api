@@ -1,14 +1,14 @@
 require "rails_helper"
 
 RSpec.describe "POST /api/v1/users", type: :request do
-  it "creates a user and returns 201 with id and email" do
+  it "creates a user and returns 201 with email" do
     expect {
       post "/api/v1/users",
         params: { email: "alice@example.com" }, headers: auth_headers, as: :json
     }.to change(User, :count).by(1)
 
     expect(response).to have_http_status(:created)
-    expect(json_body).to match("id" => kind_of(Integer), "email" => "alice@example.com")
+    expect(json_body).to match("email" => "alice@example.com")
   end
 
   it "returns 401 invalid_token when Authorization header is missing" do

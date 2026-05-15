@@ -75,7 +75,6 @@ curl -X POST http://localhost:3000/api/v1/users \
 `201 Created`
 ```json
 {
-  "id": 1,
   "email": "alice@example.com"
 }
 ```
@@ -95,7 +94,6 @@ curl http://localhost:3000/api/v1/users/1/balance \
 `200 OK`
 ```json
 {
-  "user_id": 1,
   "balance": 12500
 }
 ```
@@ -116,7 +114,7 @@ curl -X POST http://localhost:3000/api/v1/users/1/balance/adjustments \
 ```json
 {
   "amount": 5000,
-  "result": { "user_id": 1, "balance": 17500 }
+  "result": { "balance": 17500 }
 }
 ```
 
@@ -156,8 +154,8 @@ curl -X POST http://localhost:3000/api/v1/transfers \
 ```json
 {
   "amount": 2500,
-  "from": { "user_id": 1, "balance": 15000 },
-  "to":   { "user_id": 2, "balance": 8000 }
+  "from": { "balance": 15000 },
+  "to":   { "balance": 8000 }
 }
 ```
 
