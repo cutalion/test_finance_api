@@ -2,8 +2,6 @@ module Api
   module V1
     module Balance
       class AdjustmentsController < ApplicationController
-        include Idempotent
-
         before_action :load_user
 
         def create

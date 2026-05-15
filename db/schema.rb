@@ -10,27 +10,10 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_13_185122) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_15_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "citext"
   enable_extension "pg_catalog.plpgsql"
-
-  create_table "idempotency_keys", force: :cascade do |t|
-    t.datetime "completed_at"
-    t.datetime "created_at", null: false
-    t.datetime "expires_at", null: false
-    t.text "key", null: false
-    t.datetime "locked_at", null: false
-    t.text "request_hash", null: false
-    t.text "response_body"
-    t.integer "response_status"
-    t.datetime "updated_at", null: false
-    t.index ["expires_at"], name: "index_idempotency_keys_on_expires_at"
-    t.index ["key"], name: "index_idempotency_keys_on_key", unique: true
-    t.check_constraint "char_length(key) >= 1 AND char_length(key) <= 40", name: "idempotency_keys_key_length"
-    t.check_constraint "char_length(request_hash) = 64", name: "idempotency_keys_request_hash_length"
-    t.check_constraint "response_body IS NULL OR char_length(response_body) <= 16384", name: "idempotency_keys_response_body_length"
-  end
 
   create_table "users", force: :cascade do |t|
     t.bigint "balance", default: 0, null: false

@@ -10,7 +10,7 @@ Minimal Rails 8 API. See [`TASK.md`](TASK.md) for the spec.
 bin/e2e --fresh
 ```
 
-Builds the image, prepares the database, boots the server, and exercises every endpoint with `curl` (including idempotency and error paths). Stops the containers on exit.
+Builds the image, prepares the database, boots the server, and exercises every endpoint with `curl` (including error paths). Stops the containers on exit.
 
 `--fresh` wipes the postgres volume first (`docker compose down -v`). Use it when switching between the `main` and `simplified` branches (their schemas differ), or to recover from a corrupted volume left by a prior unclean shutdown. Omit it for repeat runs on the same branch.
 
@@ -49,13 +49,11 @@ curl -X POST http://localhost:3000/api/v1/users \
 # Top up Alice with 10000 (minor units)
 curl -X POST http://localhost:3000/api/v1/users/1/balance/adjustments \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -H 'Idempotency-Key: 11111111-1111-1111-1111-111111111111' \
   -d '{"amount":10000}'
 
 # Transfer 3000 from Alice → Bob
 curl -X POST http://localhost:3000/api/v1/transfers \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -H 'Idempotency-Key: 22222222-2222-2222-2222-222222222222' \
   -d '{"from_user_id":1,"to_user_id":2,"amount":3000}'
 ```
 
@@ -105,7 +103,6 @@ Top up (positive amount):
 ```bash
 curl -X POST http://localhost:3000/api/v1/users/1/balance/adjustments \
   -H "Authorization: Bearer $TOKEN" \
-  -H 'Idempotency-Key: 7c9e6679-7425-40de-944b-e07fc1f90ae7' \
   -H 'Content-Type: application/json' \
   -d '{"amount":5000}'
 ```
@@ -138,14 +135,11 @@ curl -X POST http://localhost:3000/api/v1/users/1/balance/adjustments \
 }
 ```
 
-Retrying with the same `Idempotency-Key` and body returns the original response (`201 Created`, byte-for-byte identical body). Reusing the key with a different body returns `409 Conflict`.
-
 ### 4. Transfer between users
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/transfers \
   -H "Authorization: Bearer $TOKEN" \
-  -H 'Idempotency-Key: 9b3e1234-abcd-4ef5-9876-1234567890ab' \
   -H 'Content-Type: application/json' \
   -d '{"from_user_id":1,"to_user_id":2,"amount":2500}'
 ```

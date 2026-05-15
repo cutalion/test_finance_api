@@ -222,25 +222,10 @@ assert_status 404 "$STATUS" "missing user → 404"
 # --- 3. Top up / debit --------------------------------------------------------
 step "3. Top up / debit"
 
-IDEM_TOPUP="e2e-topup-$(date +%s)-$$"
-
 http POST "/api/v1/users/$ALICE_ID/balance/adjustments" \
-  "${AUTH[@]}" -H "Idempotency-Key: $IDEM_TOPUP" \
-  -d '{"amount":5000}'
+  "${AUTH[@]}" -d '{"amount":5000}'
 assert_status 201 "$STATUS" "top up 5000"
 assert_eq "5000" "$(json_subget result balance "$BODY")" "  → result.balance is 5000"
-
-http POST "/api/v1/users/$ALICE_ID/balance/adjustments" \
-  "${AUTH[@]}" -H "Idempotency-Key: $IDEM_TOPUP" \
-  -d '{"amount":5000}'
-assert_status 201 "$STATUS" "idempotent replay returns cached response"
-assert_eq "5000" "$(json_subget result balance "$BODY")" "  → cached result.balance is 5000"
-
-http POST "/api/v1/users/$ALICE_ID/balance/adjustments" \
-  "${AUTH[@]}" -H "Idempotency-Key: $IDEM_TOPUP" \
-  -d '{"amount":1}'
-assert_status 409 "$STATUS" "idempotency conflict on body change"
-assert_eq "idempotency_conflict" "$(json_get error.code "$BODY")" "  → error.code is idempotency_conflict"
 
 http POST "/api/v1/users/$ALICE_ID/balance/adjustments" \
   "${AUTH[@]}" -d '{"amount":-2000}'
@@ -252,20 +237,11 @@ http POST "/api/v1/users/$ALICE_ID/balance/adjustments" \
 assert_status 422 "$STATUS" "overdraft rejected"
 assert_eq "insufficient_funds" "$(json_get error.code "$BODY")" "  → error.code is insufficient_funds"
 
-http POST "/api/v1/users/$ALICE_ID/balance/adjustments" \
-  "${AUTH[@]}" -H "Idempotency-Key: $(printf '%.0sx' {1..100})" \
-  -d '{"amount":1}'
-assert_status 400 "$STATUS" "oversized idempotency key rejected"
-assert_eq "malformed_idempotency_key" "$(json_get error.code "$BODY")" "  → error.code is malformed_idempotency_key"
-
 # --- 4. Transfer --------------------------------------------------------------
 step "4. Transfer between users"
 
-IDEM_XFER="e2e-xfer-$(date +%s)-$$"
-
 http POST /api/v1/transfers \
-  "${AUTH[@]}" -H "Idempotency-Key: $IDEM_XFER" \
-  -d "{\"from_user_id\":$ALICE_ID,\"to_user_id\":$BOB_ID,\"amount\":1000}"
+  "${AUTH[@]}" -d "{\"from_user_id\":$ALICE_ID,\"to_user_id\":$BOB_ID,\"amount\":1000}"
 assert_status 201 "$STATUS" "transfer 1000 alice → bob"
 assert_eq "2000" "$(json_subget from balance "$BODY")" "  → from.balance is 2000"
 assert_eq "1000" "$(json_subget to   balance "$BODY")" "  → to.balance is 1000"

@@ -1,8 +1,6 @@
 module Api
   module V1
     class TransfersController < ApplicationController
-      include Idempotent
-
       def create
         result = ::Balance::Transfer.call(
           from:   User.find_by(id: params[:from_user_id]),

@@ -119,39 +119,4 @@ RSpec.describe "POST /api/v1/transfers", type: :request do
       .with_status(:unprocessable_content)
       .with_details(current_balance: 100, requested: 500)
   end
-
-  context "with Idempotency-Key" do
-    let(:idempotency_headers) { auth_headers.merge("Idempotency-Key" => "transfer-key-xyz789") }
-
-    it "replays the original response on a duplicate request" do
-      post "/api/v1/transfers",
-        params: { from_user_id: alice.id, to_user_id: bob.id, amount: 2_500 },
-        headers: idempotency_headers, as: :json
-      expect(response).to have_http_status(:created)
-      original_body = json_body
-
-      expect {
-        post "/api/v1/transfers",
-          params: { from_user_id: alice.id, to_user_id: bob.id, amount: 2_500 },
-          headers: idempotency_headers, as: :json
-      }.not_to change { alice.reload.balance }
-
-      expect(response).to have_http_status(:created)
-      expect(json_body).to eq(original_body)
-    end
-
-    it "returns 409 idempotency_conflict when key is reused with a different body" do
-      post "/api/v1/transfers",
-        params: { from_user_id: alice.id, to_user_id: bob.id, amount: 2_500 },
-        headers: idempotency_headers, as: :json
-
-      expect {
-        post "/api/v1/transfers",
-          params: { from_user_id: alice.id, to_user_id: bob.id, amount: 9_999 },
-          headers: idempotency_headers, as: :json
-      }.not_to change { alice.reload.balance }
-
-      expect(response).to have_error_code(:idempotency_conflict).with_status(:conflict)
-    end
-  end
 end
