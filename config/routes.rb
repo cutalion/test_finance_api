@@ -4,11 +4,12 @@ Rails.application.routes.draw do
   namespace :api do
     namespace :v1 do
       post "users/auth", to: "auth#create"
-      resources :users, only: [ :create ] do
-        resource :balance, only: [ :show ] do
-          resources :adjustments, only: [ :create ], module: :balance
-        end
+      resources :users, only: [ :create ]
+
+      resource :balance, only: [ :show ] do
+        resources :adjustments, only: [ :create ], module: :balance
       end
+
       resources :transfers, only: [ :create ]
     end
   end
