@@ -252,8 +252,8 @@ step "5. Transfer between users"
 
 http POST /api/v1/transfers "${ALICE_AUTH[@]}" -d '{"recipient_email":"bob@example.com","amount":1000}'
 assert_status 201 "$STATUS" "transfer 1000 alice → bob"
-assert_eq "2000" "$(json_subget from balance "$BODY")" "  → from.balance is 2000"
-assert_eq "1000" "$(json_subget to   balance "$BODY")" "  → to.balance is 1000"
+assert_eq "1000" "$(json_get amount  "$BODY")" "  → amount is 1000"
+assert_eq "2000" "$(json_get balance "$BODY")" "  → sender balance is 2000"
 
 http GET /api/v1/balance "${ALICE_AUTH[@]}"
 assert_eq "2000" "$(json_get balance "$BODY")" "alice balance now 2000"

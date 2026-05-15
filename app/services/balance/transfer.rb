@@ -47,11 +47,7 @@ module Balance
       from.update!(balance: new_from)
       to.update!(balance: new_to)
 
-      {
-        amount: amount,
-        from:   { email: from.email, balance: new_from },
-        to:     { email: to.email,   balance: new_to }
-      }
+      { amount: amount, balance: new_from }
     end
 
     def amount_must_be_positive_integer

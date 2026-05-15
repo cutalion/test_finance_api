@@ -18,11 +18,7 @@ RSpec.describe Balance::Transfer do
       result = call
 
       expect(result).to be_success
-      expect(result.payload).to eq(
-        amount: 2_500,
-        from:   { email: alice.email, balance: 7_500 },
-        to:     { email: bob.email,   balance: 4_500 },
-      )
+      expect(result.payload).to eq(amount: 2_500, balance: 7_500)
 
       expect(alice.reload.balance).to eq(7_500)
       expect(bob.reload.balance).to   eq(4_500)

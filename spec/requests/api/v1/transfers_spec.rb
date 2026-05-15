@@ -13,11 +13,7 @@ RSpec.describe "POST /api/v1/transfers", type: :request do
      .and change { bob.reload.balance }.from(5_500).to(8_000)
 
     expect(response).to have_http_status(:created)
-    expect(json_body).to match(
-      "amount" => 2_500,
-      "from"   => { "email" => alice.email, "balance" => 15_000 },
-      "to"     => { "email" => bob.email,   "balance" => 8_000 },
-    )
+    expect(json_body).to match("amount" => 2_500, "balance" => 15_000)
   end
 
   it "returns 401 when Authorization header is missing" do
