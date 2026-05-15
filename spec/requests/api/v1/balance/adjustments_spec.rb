@@ -1,12 +1,12 @@
 require "rails_helper"
 
-RSpec.describe "POST /api/v1/users/:id/balance/adjustments", type: :request do
+RSpec.describe "POST /api/v1/balance/adjustments", type: :request do
   let(:user) { User.create!(email: "alice@example.com") }
 
   it "tops up a balance and returns 201 with the transaction" do
     expect {
-      post "/api/v1/users/#{user.id}/balance/adjustments",
-        params: { by_amount: 5000 }, headers: auth_headers, as: :json
+      post "/api/v1/balance/adjustments",
+        params: { by_amount: 5000 }, headers: auth_headers(user), as: :json
     }.to change { user.reload.balance }.from(0).to(5000)
 
     expect(response).to have_http_status(:created)
@@ -22,8 +22,8 @@ RSpec.describe "POST /api/v1/users/:id/balance/adjustments", type: :request do
     user.update!(balance: 10000)
 
     expect {
-      post "/api/v1/users/#{user.id}/balance/adjustments",
-        params: { by_amount: -3000 }, headers: auth_headers, as: :json
+      post "/api/v1/balance/adjustments",
+        params: { by_amount: -3000 }, headers: auth_headers(user), as: :json
     }.to change { user.reload.balance }.from(10000).to(7000)
 
     expect(response).to have_http_status(:created)
@@ -35,24 +35,16 @@ RSpec.describe "POST /api/v1/users/:id/balance/adjustments", type: :request do
 
   it "returns 401 when Authorization header is missing" do
     expect {
-      post "/api/v1/users/#{user.id}/balance/adjustments",
-        params: { by_amount: 5000 }, as: :json
+      post "/api/v1/balance/adjustments", params: { by_amount: 5000 }, as: :json
     }.not_to change { user.reload.balance }
 
     expect(response).to have_error_code(:invalid_token).with_status(:unauthorized)
   end
 
-  it "returns 404 user_not_found for an unknown user" do
-    post "/api/v1/users/999999/balance/adjustments",
-      params: { by_amount: 5000 }, headers: auth_headers, as: :json
-
-    expect(response).to have_error_code(:user_not_found).with_status(:not_found)
-  end
-
   it "returns 422 validation_failed for a zero amount" do
     expect {
-      post "/api/v1/users/#{user.id}/balance/adjustments",
-        params: { by_amount: 0 }, headers: auth_headers, as: :json
+      post "/api/v1/balance/adjustments",
+        params: { by_amount: 0 }, headers: auth_headers(user), as: :json
     }.not_to change { user.reload.balance }
 
     expect(response).to have_error_code(:validation_failed).with_status(:unprocessable_content)
@@ -61,8 +53,8 @@ RSpec.describe "POST /api/v1/users/:id/balance/adjustments", type: :request do
 
   it "returns 422 validation_failed when by_amount is missing" do
     expect {
-      post "/api/v1/users/#{user.id}/balance/adjustments",
-        params: {}, headers: auth_headers, as: :json
+      post "/api/v1/balance/adjustments",
+        params: {}, headers: auth_headers(user), as: :json
     }.not_to change { user.reload.balance }
 
     expect(response).to have_error_code(:validation_failed).with_status(:unprocessable_content)
@@ -70,8 +62,8 @@ RSpec.describe "POST /api/v1/users/:id/balance/adjustments", type: :request do
 
   it "returns 422 validation_failed when by_amount exceeds the configured maximum" do
     expect {
-      post "/api/v1/users/#{user.id}/balance/adjustments",
-        params: { by_amount: User::MAX_BALANCE + 1 }, headers: auth_headers, as: :json
+      post "/api/v1/balance/adjustments",
+        params: { by_amount: User::MAX_BALANCE + 1 }, headers: auth_headers(user), as: :json
     }.not_to change { user.reload.balance }
 
     expect(response).to have_error_code(:validation_failed).with_status(:unprocessable_content)
@@ -82,8 +74,8 @@ RSpec.describe "POST /api/v1/users/:id/balance/adjustments", type: :request do
     user.update!(balance: User::MAX_BALANCE - 1)
 
     expect {
-      post "/api/v1/users/#{user.id}/balance/adjustments",
-        params: { by_amount: 100 }, headers: auth_headers, as: :json
+      post "/api/v1/balance/adjustments",
+        params: { by_amount: 100 }, headers: auth_headers(user), as: :json
     }.not_to change { user.reload.balance }
 
     expect(response).to have_error_code(:balance_limit_exceeded)
@@ -95,8 +87,8 @@ RSpec.describe "POST /api/v1/users/:id/balance/adjustments", type: :request do
     user.update!(balance: 1000)
 
     expect {
-      post "/api/v1/users/#{user.id}/balance/adjustments",
-        params: { by_amount: -3000 }, headers: auth_headers, as: :json
+      post "/api/v1/balance/adjustments",
+        params: { by_amount: -3000 }, headers: auth_headers(user), as: :json
     }.not_to change { user.reload.balance }
 
     expect(response).to have_error_code(:insufficient_funds)
