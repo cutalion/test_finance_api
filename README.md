@@ -29,7 +29,7 @@ docker compose run --rm web bundle exec rspec
 # 4. Create Alice and authenticate (set JWT_SECRET in your environment or `.env` first)
 curl -X POST http://localhost:3000/api/v1/users \
   -H 'Content-Type: application/json' -d '{"email":"alice@example.com"}'
-curl -X POST http://localhost:3000/api/v1/users/auth \
+curl -X POST http://localhost:3000/api/v1/auth \
   -H 'Content-Type: application/json' -d '{"email":"alice@example.com"}'
 export ALICE_TOKEN=<access_token from the response above>
 
@@ -46,7 +46,7 @@ curl -X POST http://localhost:3000/api/v1/users \
   -d '{"email":"alice@example.com"}'
 
 # 2. Authenticate as Alice → access_token
-curl -X POST http://localhost:3000/api/v1/users/auth \
+curl -X POST http://localhost:3000/api/v1/auth \
   -H 'Content-Type: application/json' \
   -d '{"email":"alice@example.com"}'
 
@@ -70,7 +70,7 @@ curl -X POST http://localhost:3000/api/v1/transfers \
 
 ## Detailed API examples
 
-All examples assume the server is running. Authenticated endpoints require `$ALICE_TOKEN` (an access token obtained from `POST /api/v1/users/auth`).
+All examples assume the server is running. Authenticated endpoints require `$ALICE_TOKEN` (an access token obtained from `POST /api/v1/auth`).
 
 ### 1. Create user
 
@@ -97,7 +97,7 @@ curl -X POST http://localhost:3000/api/v1/users \
 ### 2. Authenticate
 
 ```bash
-curl -X POST http://localhost:3000/api/v1/users/auth \
+curl -X POST http://localhost:3000/api/v1/auth \
   -H 'Content-Type: application/json' \
   -d '{"email":"alice@example.com"}'
 ```

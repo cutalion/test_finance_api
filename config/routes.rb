@@ -3,7 +3,7 @@ Rails.application.routes.draw do
 
   namespace :api do
     namespace :v1 do
-      post "users/auth", to: "auth#create"
+      resources :auth, only: [ :create ]
       resources :users, only: [ :create ]
 
       resource :balance, only: [ :show ] do

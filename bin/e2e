@@ -208,17 +208,17 @@ assert_status 422 "$STATUS" "invalid email rejected"
 # --- 2. Auth — mint per-user tokens -------------------------------------------
 step "2. Auth — mint per-user tokens"
 
-http POST /api/v1/users/auth -H "Content-Type: application/json" -d '{"email":"alice@example.com"}'
+http POST /api/v1/auth -H "Content-Type: application/json" -d '{"email":"alice@example.com"}'
 assert_status 200 "$STATUS" "auth alice"
 ALICE_TOKEN=$(json_get access_token "$BODY")
 ALICE_ID=$(jwt_sub "$ALICE_TOKEN")
 
-http POST /api/v1/users/auth -H "Content-Type: application/json" -d '{"email":"bob@example.com"}'
+http POST /api/v1/auth -H "Content-Type: application/json" -d '{"email":"bob@example.com"}'
 assert_status 200 "$STATUS" "auth bob"
 BOB_TOKEN=$(json_get access_token "$BODY")
 BOB_ID=$(jwt_sub "$BOB_TOKEN")
 
-http POST /api/v1/users/auth -H "Content-Type: application/json" -d '{"email":"ghost@example.com"}'
+http POST /api/v1/auth -H "Content-Type: application/json" -d '{"email":"ghost@example.com"}'
 assert_status 404 "$STATUS" "auth unknown email → 404"
 
 ALICE_AUTH=(-H "Authorization: Bearer $ALICE_TOKEN" -H "Content-Type: application/json")
