@@ -49,7 +49,7 @@ curl -X POST http://localhost:3000/api/v1/users \
 # Top up Alice with 10000 (minor units)
 curl -X POST http://localhost:3000/api/v1/users/1/balance/adjustments \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"amount":10000}'
+  -d '{"by_amount":10000}'
 
 # Transfer 3000 from Alice → Bob
 curl -X POST http://localhost:3000/api/v1/transfers \
@@ -104,13 +104,13 @@ Top up (positive amount):
 curl -X POST http://localhost:3000/api/v1/users/1/balance/adjustments \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
-  -d '{"amount":5000}'
+  -d '{"by_amount":5000}'
 ```
 
 `201 Created`
 ```json
 {
-  "amount": 5000,
+  "by_amount": 5000,
   "result": { "balance": 17500 }
 }
 ```
@@ -121,7 +121,7 @@ Debit (negative amount):
 curl -X POST http://localhost:3000/api/v1/users/1/balance/adjustments \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
-  -d '{"amount":-3000}'
+  -d '{"by_amount":-3000}'
 ```
 
 `422 Unprocessable Entity` — insufficient funds

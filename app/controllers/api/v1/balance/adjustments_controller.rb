@@ -5,7 +5,7 @@ module Api
         before_action :load_user
 
         def create
-          result = ::Balance::Adjust.call(user: @user, by: params[:amount])
+          result = ::Balance::Adjust.call(user: @user, by_amount: params[:by_amount])
           return render_service_failure(result) if result.failure?
 
           render json: result.payload, status: :created
