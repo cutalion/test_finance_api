@@ -2,8 +2,6 @@
 
 Minimal Rails 8 API. See [`TASK.md`](TASK.md) for the spec.
 
-> **Branches:** [`main`](https://github.com/cutalion/test_finance_api/tree/main) records every balance change in ledger tables (transactions + transfers); [`simplified`](https://github.com/cutalion/test_finance_api/tree/simplified) (this branch) keeps only the current balance — no history. **API request paths and response shapes differ between the two branches**, so the examples below are specific to `simplified`.
-
 ## Quick start
 
 ```bash
@@ -12,7 +10,7 @@ bin/e2e --fresh
 
 Builds the image, prepares the database, boots the server, and exercises every endpoint with `curl` (including error paths). Stops the containers on exit.
 
-`--fresh` wipes the postgres volume first (`docker compose down -v`). Use it when switching between the `main` and `simplified` branches (their schemas differ), or to recover from a corrupted volume left by a prior unclean shutdown. Omit it for repeat runs on the same branch.
+`--fresh` wipes the postgres volume first (`docker compose down -v`). Use it to recover from a corrupted volume left by a prior unclean shutdown. Omit it for repeat runs.
 
 ## Manual testing (Docker Compose)
 
